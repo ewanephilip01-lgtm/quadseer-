@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}Scans - QuadSeer{% endblock %}
+{% block content %}
+<div x-data="scansPage()" x-init="init()">
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="text-3xl font-bold">Scans</h1>
+            <p class="text-slate-400">Monitor scan status and review findings</p>
+        </div>
+        <div class="flex gap-2">
+            <button @click="pollInterval ? stopPolling() : startPolling()" 
+                    :class="pollInterval ? 'bg-amber-600 hover:bg-amber-500' : 'bg-slate-700 hover:bg-slate-600'"
+                    class="px-4 py-2 rounded-lg transition text-sm">
+                <i class="fas fa-sync mr-1" :class="pollInterval ? 'fa-spin' : ''"></i>
+                <span x-text="pollInterval ? 'Stop Updates' : 'Auto-Refresh'"></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Scan Results Modal -->
+    <div x-show="selectedScan" x-cloak class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" @click.self="selectedScan = null">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-4xl max-h-[80vh] overflow-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold" x-text="`Scan #${selectedScan?.id} - ${selectedScan?.scan_type}`"></h2>
+                <button @click="selectedScan = null" class="text-slate-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+            </div>
+
+            <!-- Summary -->
+            <div class="grid grid-cols-5 gap-3 mb-6" x-show="scanSummary">
+                <div class="bg-slate-900 rounded-lg p-3 text-center">
+                    <p class="text-2xl font-bold" x-text="scanSummary.total_findings">0</p>
+                    <p class="text-xs text-slate-400">Total</p>
+                </div>
+                <div class="bg-red-900/30 border border-red-800 rounded-lg p-3 text-center">
+                    <p class="text-2xl font-bold text-red-400" x-text="scanSummary.severity_breakdown?.critical || 0">0</p>
+                    <p class="text-xs text-red-300">Critical</p>
+                </div>
+                <div class="bg-orange-900/30 border border-orange-800 rounded-lg p-3 text-center">
+                    <p class="text-2xl font-bold text-orange-400" x-text="scanSummary.severity_breakdown?.high || 0">0</p>
+                    <p class="text-xs text-orange-300">High</p>
+                </div>
+                <div class="bg-amber-900/30 border border-amber-800 rounded-lg p-3 text-center">
+                    <p class="text-2xl font-bold text-amber-400" x-text="scanSummary.severity_breakdown?.medium || 0">0</p>
+                    <p class="text-xs text-amber-300">Medium</p>
+                </div>
+                <div class="bg-blue-900/30 border border-blue-800 rounded-lg p-3 text-center">
+                    <p class="text-2xl font-bold text-blue-400" x-text="scanSummary.severity_breakdown?.info || 0">0</p>
+                    <p class="text-xs text-blue-300">Info</p>
+                </div>
+            </div>
+
+            <!-- Findings List -->
+            <div class="space-y-3">
+                <template x-if="scanFindings.length === 0">
+                    <div class="text-center py-8 text-slate-500">
+                        <div x-show="selectedScan?.status === 'running'" class="flex items-center justify-center gap-2">
+                            <div class="spinner w-5 h-5 border-2"></div>
+                            <span>Scan in progress...</span>
+                        </div>
+                        <div x-show="selectedScan?.status !== 'running'">
+                            <i class="fas fa-clipboard-check text-3xl mb-2"></i>
+                            <p>No findings for this scan.</p>
+                        </div>
+                    </div>
+                </template>
+                <template x-for="finding in scanFindings" :key="finding.id">
+                    <div class="bg-slate-900 border rounded-lg p-4"
+                         :class="finding.severity === 'critical' ? 'border-red-800' : finding.severity === 'high' ? 'border-orange-800' : finding.severity === 'medium' ? 'border-amber-800' : 'border-slate-700'">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-xs px-2 py-0.5 rounded font-bold uppercase"
+                                          :class="finding.severity === 'critical' ? 'bg-red-600' : finding.severity === 'high' ? 'bg-orange-600' : finding.severity === 'medium' ? 'bg-amber-600' : 'bg-slate-600'"
+                                          x-text="finding.severity"></span>
+                                    <span class="text-xs text-slate-500" x-text="finding.finding_type"></span>
+                                    <span class="text-xs text-slate-500" x-text="finding.source"></span>
+                                </div>
+                                <h4 class="font-semibold mb-1" x-text="finding.title"></h4>
+                                <p class="text-sm text-slate-400 mb-2" x-text="finding.description"></p>
+                                <div class="flex items-center gap-4 text-xs text-slate-500">
+                                    <span><i class="fas fa-chart-line mr-1"></i>Risk: <span x-text="finding.risk_score"></span></span>
+                                    <span><i class="fas fa-crosshairs mr-1"></i>Confidence: <span x-text="finding.confidence"></span></span>
+                                    <a x-show="finding.source_reference" :href="finding.source_reference" target="_blank" class="text-blue-400 hover:text-blue-300">
+                                        <i class="fas fa-external-link-alt mr-1"></i>Source
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scans Table -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+        <table class="w-full">
+            <thead class="bg-slate-900/50 text-left text-sm text-slate-400">
+                <tr>
+                    <th class="px-6 py-3">ID</th>
+                    <th class="px-6 py-3">Type</th>
+                    <th class="px-6 py-3">Target</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3">Findings</th>
+                    <th class="px-6 py-3">Started</th>
+                    <th class="px-6 py-3">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-700">
+                <template x-if="scans.length === 0">
+                    <tr>
+                        <td colspan="7" class="px-6 py-12 text-center text-slate-500">
+                            <i class="fas fa-radar text-3xl mb-2"></i>
+                            <p>No scans yet. Go to Targets to start scanning.</p>
+                        </td>
+                    </tr>
+                </template>
+                <template x-for="scan in scans" :key="scan.id">
+                    <tr class="hover:bg-slate-750 transition">
+                        <td class="px-6 py-4 font-mono text-sm" x-text="`#${scan.id}`"></td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 rounded text-xs font-medium bg-slate-700"
+                                  x-text="scan.scan_type"></span>
+                        </td>
+                        <td class="px-6 py-4 text-sm" x-text="getTargetName(scan.target_id)"></td>
+                        <td class="px-6 py-4">
+                            <span class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full"
+                                      :class="scan.status === 'completed' ? 'bg-emerald-500' : scan.status === 'running' ? 'bg-blue-500 animate-pulse' : scan.status === 'failed' ? 'bg-red-500' : 'bg-amber-500'"></span>
+                                <span class="text-sm capitalize" x-text="scan.status"></span>
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="text-sm" x-text="scan.results_summary?.findings_count || 0"></span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-slate-400" x-text="formatDate(scan.created_at)"></td>
+                        <td class="px-6 py-4">
+                            <button @click="viewScan(scan)" class="text-blue-400 hover:text-blue-300 text-sm mr-3">
+                                <i class="fas fa-eye mr-1"></i>View
+                            </button>
+                            <button x-show="scan.status === 'completed'" @click="downloadReport(scan.id)" class="text-slate-400 hover:text-white text-sm">
+                                <i class="fas fa-file-pdf mr-1"></i>PDF
+                            </button>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function scansPage() {
+    return {
+        scans: [],
+        targets: [],
+        selectedScan: null,
+        scanFindings: [],
+        scanSummary: null,
+        pollInterval: null,
+
+        async init() {
+            await this.loadTargets();
+            await this.loadScans();
+        },
+
+        async loadTargets() {
+            this.targets = await this.api('GET', '/api/v1/targets/');
+        },
+
+        async loadScans() {
+            this.scans = await this.api('GET', '/api/v1/scans/');
+        },
+
+        getTargetName(targetId) {
+            const t = this.targets.find(t => t.id === targetId);
+            return t ? t.domain : `Target #${targetId}`;
+        },
+
+        formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const d = new Date(dateStr);
+            return d.toLocaleString();
+        },
+
+        async viewScan(scan) {
+            this.selectedScan = scan;
+            this.scanFindings = [];
+            this.scanSummary = null;
+
+            try {
+                this.scanFindings = await this.api('GET', `/api/v1/scans/${scan.id}/results`);
+                this.scanSummary = await this.api('GET', `/api/v1/scans/${scan.id}/findings/summary`);
+            } catch (e) {}
+        },
+
+        startPolling() {
+            this.pollInterval = setInterval(() => this.loadScans(), 5000);
+        },
+
+        stopPolling() {
+            clearInterval(this.pollInterval);
+            this.pollInterval = null;
+        },
+
+        downloadReport(scanId) {
+            window.open(`/api/v1/reports/${scanId}/download`, '_blank');
+        }
+    }
+}
+</script>
+{% endblock %}

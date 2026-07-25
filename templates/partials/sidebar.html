@@ -1,0 +1,10 @@
+<ul class="sidebar-nav">
+    <li><a href="/" :class="{ 'active': currentPage === 'dashboard' }" @click="currentPage = 'dashboard'"><span class="icon">📊</span> Dashboard</a></li>
+    <li><a href="/assets" :class="{ 'active': currentPage === 'assets' }" @click="currentPage = 'assets'"><span class="icon">🌐</span> Asset Inventory</a></li>
+    <li><a href="/scans" :class="{ 'active': currentPage === 'scans' }" @click="currentPage = 'scans'"><span class="icon">🔍</span> Scans</a></li>
+    <li><a href="/threats" :class="{ 'active': currentPage === 'threats' }" @click="currentPage = 'threats'"><span class="icon">🛡️</span> Threat Intel</a></li>
+    <li><a href="/reports" :class="{ 'active': currentPage === 'reports' }" @click="currentPage = 'reports'"><span class="icon">📄</span> Reports</a></li>
+    <li class="divider"></li>
+    <li><a href="/api/docs" target="_blank"><span class="icon">📚</span> API Docs</a></li>
+    <li><a href="http://localhost:5555" target="_blank"><span class="icon">🌸</span> Flower</a></li>
+</ul>

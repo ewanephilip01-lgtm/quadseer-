@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}QuadSeer - External Attack Surface Management{% endblock %}
+{% block content %}
+<div class="hero">
+    <h1>QuadSeer</h1>
+    <p>External Attack Surface Management & Threat Intelligence Platform. Discover, monitor, and secure your digital footprint.</p>
+    <a href="/register" class="btn btn-primary" style="font-size: 1.1rem; padding: 0.8rem 2rem;">Get Started</a>
+    <a href="/login" class="btn btn-secondary" style="font-size: 1.1rem; padding: 0.8rem 2rem; margin-left: 1rem;">Sign In</a>
+</div>
+<div class="grid" style="margin-top: 2rem;">
+    <div class="card">
+        <h3 style="color: var(--highlight); margin-bottom: 0.5rem;">🔍 Reconnaissance</h3>
+        <p style="color: #8899aa;">DNS enumeration, port scanning, SSL analysis, and technology fingerprinting.</p>
+    </div>
+    <div class="card">
+        <h3 style="color: var(--highlight); margin-bottom: 0.5rem;">🛡️ Threat Intel</h3>
+        <p style="color: #8899aa;">Monitor threat actors, check for breaches, and track ransomware leak sites.</p>
+    </div>
+    <div class="card">
+        <h3 style="color: var(--highlight); margin-bottom: 0.5rem;">📊 Reporting</h3>
+        <p style="color: #8899aa;">Generate comprehensive PDF reports with findings and remediation guidance.</p>
+    </div>
+    <div class="card">
+        <h3 style="color: var(--highlight); margin-bottom: 0.5rem;">🌐 Dark Web</h3>
+        <p style="color: #8899aa;">Monitor paste sites, hacker forums, and dark web marketplaces for leaked data.</p>
+    </div>
+</div>
+{% endblock %}

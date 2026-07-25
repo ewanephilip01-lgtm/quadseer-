@@ -1,0 +1,45 @@
+{% extends "base.html" %}{% block title %}Organization - QuadSeer{% endblock %}{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="org()" x-init="loadOrg()">
+    <div class="flex items-center justify-between mb-8"><div><h1 class="text-3xl font-bold">Organization</h1><p class="text-slate-400 mt-1">Team management and settings</p></div></div>
+    <div x-show="!organization" class="glass rounded-2xl p-8 text-center">
+        <i class="fas fa-building text-5xl text-slate-600 mb-4"></i>
+        <h3 class="text-xl font-semibold mb-2">No Organization Yet</h3>
+        <p class="text-slate-400 mb-6">Create an organization to invite team members and share resources.</p>
+        <div class="max-w-md mx-auto" x-data="{ name: '', description: '', creating: false }">
+            <form @submit.prevent="createOrg()" class="space-y-4">
+                <input x-model="name" type="text" required placeholder="Organization name" class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-primary-500 outline-none">
+                <input x-model="description" type="text" placeholder="Description" class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-primary-500 outline-none">
+                <button type="submit" :disabled="creating" class="w-full py-3 bg-gradient-to-r from-primary-500 to-accent-500 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-50">Create Organization</button>
+            </form>
+        </div>
+    </div>
+    <div x-show="organization" class="space-y-6">
+        <div class="glass rounded-2xl p-6">
+            <h3 class="text-lg font-semibold mb-2" x-text="organization.name"></h3>
+            <p class="text-slate-400 text-sm" x-text="organization.description || 'No description'"></p>
+        </div>
+        <div class="glass rounded-2xl p-6">
+            <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-semibold">Members</h3>
+                <div class="flex gap-2" x-data="{ email: '', inviting: false }">
+                    <input x-model="email" type="email" placeholder="Email to invite" class="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:border-primary-500 outline-none">
+                    <button @click="inviteMember(email)" class="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-500 rounded-lg text-sm font-medium hover:opacity-90 transition">Invite</button>
+                </div>
+            </div>
+            <div class="space-y-2">
+                <template x-for="member in members" :key="member.id">
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/50">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-sm font-bold" x-text="member.full_name?.charAt(0)?.toUpperCase()"></div>
+                            <div><div class="text-sm font-medium" x-text="member.full_name || member.email"></div><div class="text-xs text-slate-500" x-text="member.email"></div></div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-1 rounded text-xs capitalize" :class="member.role === 'owner' ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-500/10 text-slate-400'" x-text="member.role"></span>
+                            <button x-show="member.role !== 'owner'" @click="removeMember(member.id)" class="text-red-400 hover:text-red-300"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>
+{% block scripts %}<script>function org(){return{organization:null,members:[],async loadOrg(){try{const r=await this.apiCall('/api/organizations/my');if(r.ok){this.organization=await r.json();this.loadMembers()}}catch(e){this.organization=null}},async loadMembers(){try{const r=await this.apiCall('/api/organizations/my/members');if(r.ok)this.members=await r.json()}catch(e){}},async createOrg(){const d=document.querySelector('[x-data*="name"]')._x_dataStack[0];try{const r=await this.apiCall('/api/organizations/',{method:'POST',body:JSON.stringify({name:d.name,description:d.description})});if(r.ok){window.dispatchEvent(new CustomEvent('toast',{detail:{id:Date.now(),type:'success',message:'Organization created!'}}));this.loadOrg()}}catch(e){}},async inviteMember(email){try{const r=await this.apiCall('/api/organizations/invite?email='+encodeURIComponent(email)+'&role=member',{method:'POST'});if(r.ok){window.dispatchEvent(new CustomEvent('toast',{detail:{id:Date.now(),type:'success',message:'Invitation sent!'}}));this.loadMembers()}}catch(e){}},async removeMember(id){if(!confirm('Remove this member?'))return;try{await this.apiCall(`/api/organizations/members/${id}`,{method:'DELETE'});this.loadMembers()}catch(e){}}}}</script>{% endblock %}

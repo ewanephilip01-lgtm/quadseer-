@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Register — QuadSeer{% endblock %}
+{% block content %}
+<div class="auth-container">
+    <article class="auth-card">
+        <header>
+            <h1>Create Account</h1>
+            <p>Join QuadSeer to start securing your attack surface</p>
+        </header>
+        <form x-data="registerForm()" @submit.prevent="submit()">
+            <label>
+                Full Name
+                <input type="text" x-model="form.full_name" placeholder="John Doe">
+            </label>
+            <label>
+                Username
+                <input type="text" x-model="form.username" required placeholder="johndoe">
+            </label>
+            <label>
+                Email
+                <input type="email" x-model="form.email" required placeholder="john@example.com">
+            </label>
+            <label>
+                Password
+                <input type="password" x-model="form.password" required minlength="8" placeholder="Min 8 characters">
+            </label>
+            <button type="submit" class="btn btn-primary" :disabled="submitting" aria-busy="submitting">
+                <span x-show="!submitting">Create Account</span>
+                <span x-show="submitting">Creating...</span>
+            </button>
+            <p class="auth-footer">Already have an account? <a href="/login">Sign in</a></p>
+        </form>
+    </article>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function registerForm() {
+    return {
+        form: { full_name: '', username: '', email: '', password: '' },
+        submitting: false,
+
+        async submit() {
+            this.submitting = true;
+            try {
+                const res = await fetch('/api/v1/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.form)
+                });
+                if (res.ok) {
+                    $store.toasts.add('Account created! Redirecting...', 'success');
+                    setTimeout(() => window.location.href = '/login', 1500);
+                } else {
+                    const err = await res.json();
+                    $store.toasts.add(err.detail || 'Registration failed', 'error');
+                }
+            } catch (e) {
+                $store.toasts.add('Network error', 'error');
+            } finally {
+                this.submitting = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

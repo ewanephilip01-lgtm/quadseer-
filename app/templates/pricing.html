@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% block title %}Pricing - QuadSeer{% endblock %}{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="text-center mb-16"><h1 class="text-4xl font-bold mb-4">Simple, Transparent Pricing</h1><p class="text-slate-400">Choose the plan that fits your security needs</p></div>
+    <div class="grid md:grid-cols-3 gap-8" x-data="{ plans: [], loading: true }" x-init="fetch('/api/billing/plans').then(r=>r.json()).then(d=>{plans=d;loading=false})">
+        <template x-for="plan in plans" :key="plan.id">
+            <div class="glass rounded-2xl p-8 relative" :class="plan.is_popular ? 'border-2 border-primary-500/50' : ''">
+                <div x-show="plan.is_popular" class="absolute -top-3 left-1/2 transform -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-primary-500 to-accent-500 rounded-full text-xs font-bold">Most Popular</div>
+                <h3 class="text-xl font-bold mb-2" x-text="plan.name"></h3>
+                <p class="text-slate-400 text-sm mb-6" x-text="plan.description"></p>
+                <div class="mb-6"><span class="text-4xl font-bold">$<span x-text="plan.price_monthly"></span></span><span class="text-slate-500">/mo</span></div>
+                <ul class="space-y-3 mb-8">
+                    <li class="flex items-center gap-2 text-sm"><i class="fas fa-check text-green-400"></i><span x-text="plan.max_scans_per_month + ' scans/month'"></span></li>
+                    <li class="flex items-center gap-2 text-sm"><i class="fas fa-check text-green-400"></i><span x-text="plan.max_monitors + ' monitors'"></span></li>
+                    <li class="flex items-center gap-2 text-sm"><i class="fas fa-check text-green-400"></i><span x-text="plan.max_users + ' users'"></span></li>
+                </ul>
+                <button @click="checkout(plan.id)" class="w-full py-3 rounded-xl font-semibold transition" :class="plan.is_popular ? 'bg-gradient-to-r from-primary-500 to-accent-500 hover:opacity-90' : 'border border-slate-700 hover:bg-slate-800'">Get Started</button>
+            </div>
+        </template>
+    </div>
+</div>
+{% block scripts %}<script>function checkout(planId){const token=localStorage.getItem('token');if(!token){window.location.href='/login';return;}fetch('/api/billing/checkout',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({plan_id:planId,interval:'monthly',email:''})}).then(r=>r.json()).then(d=>{if(d.payment_link)window.location.href=d.payment_link;else window.dispatchEvent(new CustomEvent('toast',{detail:{id:Date.now(),type:'success',message:'Checkout simulated (no payment provider configured)'}}));});}</script>{% endblock %}

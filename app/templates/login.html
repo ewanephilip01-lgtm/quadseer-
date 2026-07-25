@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Login - QuadSeer{% endblock %}
+{% block content %}
+<div class="min-h-screen flex items-center justify-center" x-data="loginForm()">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-8 w-full max-w-md shadow-2xl">
+        <div class="text-center mb-8">
+            <i class="fas fa-shield-halved text-blue-400 text-4xl mb-4"></i>
+            <h1 class="text-2xl font-bold">QuadSeer</h1>
+            <p class="text-slate-400 text-sm mt-1">Cyber Threat Intelligence Platform</p>
+        </div>
+
+        <form @submit.prevent="submit()" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-1">Email</label>
+                <input type="email" x-model="email" required
+                       class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"
+                       placeholder="admin@quadseer.local">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-1">Password</label>
+                <input type="password" x-model="password" required
+                       class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"
+                       placeholder="••••••••">
+            </div>
+            <button type="submit" :disabled="loading"
+                    class="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 text-white font-semibold py-2.5 rounded-lg transition flex items-center justify-center gap-2">
+                <div x-show="loading" class="spinner w-5 h-5 border-2"></div>
+                <span x-text="loading ? 'Signing in...' : 'Sign In'"></span>
+            </button>
+        </form>
+
+        <p class="text-center text-slate-500 text-sm mt-6">
+            Don't have an account? <a href="/register" class="text-blue-400 hover:text-blue-300">Create one</a>
+        </p>
+    </div>
+</div>
+
+<script>
+function loginForm() {
+    return {
+        email: '',
+        password: '',
+        loading: false,
+
+        async submit() {
+            this.loading = true;
+            try {
+                const resp = await fetch('/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: this.email, password: this.password })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || 'Login failed');
+
+                localStorage.setItem('token', data.access_token);
+                window.location.href = '/dashboard';
+            } catch (e) {
+                this.showToast?.(e.message, 'error') || alert(e.message);
+            } finally {
+                this.loading = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

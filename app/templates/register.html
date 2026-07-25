@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Register - QuadSeer{% endblock %}
+{% block content %}
+<div class="min-h-screen flex items-center justify-center" x-data="registerForm()">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-8 w-full max-w-md shadow-2xl">
+        <div class="text-center mb-8">
+            <i class="fas fa-shield-halved text-blue-400 text-4xl mb-4"></i>
+            <h1 class="text-2xl font-bold">Create Account</h1>
+            <p class="text-slate-400 text-sm mt-1">Join QuadSeer Threat Intelligence</p>
+        </div>
+
+        <form @submit.prevent="submit()" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-1">Full Name</label>
+                <input type="text" x-model="fullName" required
+                       class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 focus:border-blue-500 outline-none"
+                       placeholder="John Doe">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-1">Username</label>
+                <input type="text" x-model="username" required
+                       class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 focus:border-blue-500 outline-none"
+                       placeholder="johndoe">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-1">Email</label>
+                <input type="email" x-model="email" required
+                       class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 focus:border-blue-500 outline-none"
+                       placeholder="john@company.com">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-1">Password</label>
+                <input type="password" x-model="password" required minlength="8"
+                       class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 focus:border-blue-500 outline-none"
+                       placeholder="Min 8 characters">
+            </div>
+            <button type="submit" :disabled="loading"
+                    class="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 text-white font-semibold py-2.5 rounded-lg transition flex items-center justify-center gap-2">
+                <div x-show="loading" class="spinner w-5 h-5 border-2"></div>
+                <span x-text="loading ? 'Creating...' : 'Create Account'"></span>
+            </button>
+        </form>
+
+        <p class="text-center text-slate-500 text-sm mt-6">
+            Already have an account? <a href="/login" class="text-blue-400 hover:text-blue-300">Sign in</a>
+        </p>
+    </div>
+</div>
+
+<script>
+function registerForm() {
+    return {
+        fullName: '',
+        username: '',
+        email: '',
+        password: '',
+        loading: false,
+
+        async submit() {
+            this.loading = true;
+            try {
+                const resp = await fetch('/api/v1/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        full_name: this.fullName,
+                        username: this.username,
+                        email: this.email,
+                        password: this.password
+                    })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || 'Registration failed');
+
+                localStorage.setItem('token', data.access_token);
+                window.location.href = '/dashboard';
+            } catch (e) {
+                alert(e.message);
+            } finally {
+                this.loading = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

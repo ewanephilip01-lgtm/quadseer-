@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Admin - QuadSeer{% endblock %}
+{% block content %}
+<div x-data="adminPage()" x-init="init()">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold">Admin Dashboard</h1>
+        <p class="text-slate-400">Platform configuration and management</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Stats -->
+        <div class="lg:col-span-3 grid grid-cols-4 gap-4">
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 text-center">
+                <p class="text-3xl font-bold text-blue-400" x-text="stats.total_users">0</p>
+                <p class="text-sm text-slate-400">Users</p>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 text-center">
+                <p class="text-3xl font-bold text-emerald-400" x-text="stats.total_targets">0</p>
+                <p class="text-sm text-slate-400">Targets</p>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 text-center">
+                <p class="text-3xl font-bold text-amber-400" x-text="stats.total_scans">0</p>
+                <p class="text-sm text-slate-400">Scans</p>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 text-center">
+                <p class="text-3xl font-bold text-red-400" x-text="stats.total_findings">0</p>
+                <p class="text-sm text-slate-400">Findings</p>
+            </div>
+        </div>
+
+        <!-- Configs -->
+        <div class="lg:col-span-2">
+            <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                    <h2 class="text-lg font-semibold"><i class="fas fa-cogs mr-2 text-blue-400"></i>System Configurations</h2>
+                    <button @click="initConfigs()" class="text-sm bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded transition">
+                        <i class="fas fa-wand-magic-sparkles mr-1"></i>Initialize Defaults
+                    </button>
+                </div>
+
+                <!-- Tabs -->
+                <div class="flex border-b border-slate-700">
+                    <button @click="activeTab = 'apikeys'" :class="activeTab === 'apikeys' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-slate-400'" class="px-6 py-3 text-sm font-medium transition">API Keys</button>
+                    <button @click="activeTab = 'scan'" :class="activeTab === 'scan' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-slate-400'" class="px-6 py-3 text-sm font-medium transition">Scan Settings</button>
+                    <button @click="activeTab = 'notify'" :class="activeTab === 'notify' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-slate-400'" class="px-6 py-3 text-sm font-medium transition">Notifications</button>
+                </div>
+
+                <div class="p-6">
+                    <template x-if="activeTab === 'apikeys'">
+                        <div class="space-y-4">
+                            <template x-for="config in apiKeyConfigs" :key="config.config_key">
+                                <div class="flex items-center gap-4">
+                                    <div class="flex-1">
+                                        <label class="block text-sm font-medium text-slate-300 mb-1" x-text="config.description || config.config_key"></label>
+                                        <input :type="config.config_type === 'secret' ? 'password' : 'text'"
+                                               :value="config.config_value"
+                                               @blur="updateConfig(config.config_key, $event.target.value, config.config_type, config.description)"
+                                               class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-sm outline-none focus:border-blue-500"
+                                               :placeholder="config.config_key">
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                    <template x-if="activeTab === 'scan'">
+                        <div class="space-y-4">
+                            <template x-for="config in scanConfigs" :key="config.config_key">
+                                <div class="flex items-center gap-4">
+                                    <div class="flex-1">
+                                        <label class="block text-sm font-medium text-slate-300 mb-1" x-text="config.description || config.config_key"></label>
+                                        <input :type="config.config_type === 'int' ? 'number' : 'text'"
+                                               :value="config.config_value"
+                                               @blur="updateConfig(config.config_key, $event.target.value, config.config_type, config.description)"
+                                               class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-sm outline-none focus:border-blue-500">
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                    <template x-if="activeTab === 'notify'">
+                        <div class="space-y-4">
+                            <template x-for="config in notifyConfigs" :key="config.config_key">
+                                <div class="flex items-center gap-4">
+                                    <div class="flex-1">
+                                        <label class="block text-sm font-medium text-slate-300 mb-1" x-text="config.description || config.config_key"></label>
+                                        <input :type="config.config_type === 'secret' ? 'password' : 'text'"
+                                               :value="config.config_value"
+                                               @blur="updateConfig(config.config_key, $event.target.value, config.config_type, config.description)"
+                                               class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-sm outline-none focus:border-blue-500">
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users -->
+        <div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-700">
+                    <h2 class="text-lg font-semibold"><i class="fas fa-users mr-2 text-blue-400"></i>Users</h2>
+                </div>
+                <div class="divide-y divide-slate-700 max-h-[500px] overflow-auto">
+                    <template x-for="user in users" :key="user.id">
+                        <div class="px-6 py-3 flex items-center gap-3">
+                            <div class="w-8 h-8 bg-blue-900/50 rounded-full flex items-center justify-center text-sm font-bold">
+                                <span x-text="user.username[0].toUpperCase()"></span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium truncate" x-text="user.email"></p>
+                                <p class="text-xs text-slate-500" x-text="user.username"></p>
+                            </div>
+                            <span x-show="user.is_admin" class="text-xs bg-blue-600 px-2 py-0.5 rounded-full">Admin</span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function adminPage() {
+    return {
+        stats: {},
+        configs: [],
+        users: [],
+        activeTab: 'apikeys',
+
+        get apiKeyConfigs() {
+            return this.configs.filter(c => ['hibp_api_key','dehashed_email','dehashed_api_key','ransomware_live_api_key'].includes(c.config_key));
+        },
+        get scanConfigs() {
+            return this.configs.filter(c => ['scan_concurrent_limit','port_scan_range','ssl_check_expiry_days','darkweb_timeout'].includes(c.config_key));
+        },
+        get notifyConfigs() {
+            return this.configs.filter(c => ['smtp_host','smtp_port','smtp_username','smtp_password','smtp_from_email','slack_webhook_url','discord_webhook_url'].includes(c.config_key));
+        },
+
+        async init() {
+            await this.loadStats();
+            await this.loadConfigs();
+            await this.loadUsers();
+        },
+
+        async loadStats() {
+            this.stats = await this.api('GET', '/api/v1/admin/stats');
+        },
+
+        async loadConfigs() {
+            this.configs = await this.api('GET', '/api/v1/admin/configs');
+        },
+
+        async loadUsers() {
+            this.users = await this.api('GET', '/api/v1/admin/users');
+        },
+
+        async initConfigs() {
+            try {
+                await this.api('POST', '/api/v1/admin/configs/initialize');
+                await this.loadConfigs();
+                this.showToast?.('Default configs initialized', 'success');
+            } catch (e) {}
+        },
+
+        async updateConfig(key, value, type, desc) {
+            try {
+                await this.api('PUT', `/api/v1/admin/configs/${key}`, {
+                    config_value: value,
+                    config_type: type,
+                    description: desc
+                });
+                this.showToast?.('Config saved', 'success');
+            } catch (e) {}
+        }
+    }
+}
+</script>
+{% endblock %}

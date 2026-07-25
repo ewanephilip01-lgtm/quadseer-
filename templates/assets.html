@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+{% block title %}Asset Inventory — QuadSeer{% endblock %}
+{% block content %}
+<div x-data="assetsApp()" x-init="initAssets()">
+    <header class="page-header">
+        <h1>Asset Inventory</h1>
+        <div class="header-actions">
+            <select x-model="selectedTarget" @change="loadAssets()">
+                <option value="">All Targets</option>
+                <template x-for="target in targets" :key="target.id">
+                    <option :value="target.id" x-text="target.name + ' (' + target.value + ')'"></option>
+                </template>
+            </select>
+            <button class="btn btn-primary" @click="showReconModal = true" :disabled="!selectedTarget">
+                🔍 Run Recon
+            </button>
+        </div>
+    </header>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar" x-show="stats.total_assets > 0">
+        <div class="stat-pill">
+            <span class="stat-number" x-text="stats.total_assets"></span>
+            <span class="stat-label">Total Assets</span>
+        </div>
+        <div class="stat-pill danger">
+            <span class="stat-number" x-text="stats.high_risk_assets"></span>
+            <span class="stat-label">High Risk</span>
+        </div>
+        <template x-for="(count, type) in stats.by_type" :key="type">
+            <div class="stat-pill">
+                <span class="stat-number" x-text="count"></span>
+                <span class="stat-label" x-text="type + 's'"></span>
+            </div>
+        </template>
+    </div>
+
+    <!-- Recon Modal -->
+    <div x-show="showReconModal" class="modal" x-transition.opacity @click.self="showReconModal = false">
+        <div class="modal-content">
+            <header>
+                <h3>Start Reconnaissance</h3>
+                <button class="close" @click="showReconModal = false">×</button>
+            </header>
+            <form @submit.prevent="startRecon()">
+                <p>Target: <strong x-text="selectedTargetName()"></strong></p>
+                <label>
+                    Scan Depth
+                    <select x-model="reconConfig.scan_depth">
+                        <option value="quick">Quick (~2 min) — Top 20 ports, basic DNS</option>
+                        <option value="standard">Standard (~5 min) — Top 100 ports, full DNS, SSL</option>
+                        <option value="deep">Deep (~15 min) — Full port range, all modules</option>
+                    </select>
+                </label>
+                <footer>
+                    <button type="button" class="btn btn-secondary" @click="showReconModal = false">Cancel</button>
+                    <button type="submit" class="btn btn-primary" :disabled="reconning">
+                        <span x-show="!reconning">Start Discovery</span>
+                        <span x-show="reconning">Discovering...</span>
+                    </button>
+                </footer>
+            </form>
+        </div>
+    </div>
+
+    <!-- Asset Detail Modal -->
+    <div x-show="selectedAsset" class="modal" x-transition.opacity @click.self="selectedAsset = null">
+        <div class="modal-content modal-lg">
+            <header>
+                <h3 x-text="selectedAsset?.name"></h3>
+                <button class="close" @click="selectedAsset = null">×</button>
+            </header>
+            <div class="asset-detail" x-show="selectedAsset">
+                <div class="detail-grid">
+                    <div class="detail-section">
+                        <h4>Basic Info</h4>
+                        <dl>
+                            <dt>Type</dt><dd><span class="tag" x-text="selectedAsset?.asset_type"></span></dd>
+                            <dt>Value</dt><dd><code x-text="selectedAsset?.value"></code></dd>
+                            <dt>Status</dt><dd><span class="badge" :class="'badge-' + selectedAsset?.status" x-text="selectedAsset?.status"></span></dd>
+                            <dt>Source</dt><dd x-text="selectedAsset?.source"></dd>
+                            <dt>First Seen</dt><dd x-text="selectedAsset?.first_seen ? new Date(selectedAsset.first_seen).toLocaleString() : '—'"></dd>
+                            <dt>Last Seen</dt><dd x-text="selectedAsset?.last_seen ? new Date(selectedAsset.last_seen).toLocaleString() : '—'"></dd>
+                        </dl>
+                    </div>
+                    <div class="detail-section">
+                        <h4>Risk Assessment</h4>
+                        <div class="risk-meter">
+                            <div class="risk-bar">
+                                <div class="risk-fill" :style="'width:' + (selectedAsset?.risk_score || 0) + '%'" :class="'risk-' + Math.floor((selectedAsset?.risk_score || 0) / 25)"></div>
+                            </div>
+                            <span class="risk-value" x-text="(selectedAsset?.risk_score || 0).toFixed(0) + '/100'"></span>
+                        </div>
+                        <div class="risk-factors" x-show="selectedAsset?.risk_factors?.length > 0">
+                            <template x-for="factor in selectedAsset?.risk_factors" :key="factor">
+                                <span class="risk-tag" x-text="factor.replace(/_/g, ' ')"></span>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ports -->
+                <div class="detail-section" x-show="selectedAsset?.ports?.length > 0">
+                    <h4>Open Ports</h4>
+                    <table class="detail-table">
+                        <thead><tr><th>Port</th><th>Service</th><th>Banner</th></tr></thead>
+                        <tbody>
+                            <template x-for="port in selectedAsset?.ports" :key="port.port">
+                                <tr>
+                                    <td><code x-text="port.port"></code></td>
+                                    <td><span class="tag" x-text="port.service"></span></td>
+                                    <td class="banner-cell" x-text="port.banner || '—'"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Technologies -->
+                <div class="detail-section" x-show="selectedAsset?.technologies?.length > 0">
+                    <h4>Detected Technologies</h4>
+                    <div class="tech-tags">
+                        <template x-for="tech in selectedAsset?.technologies" :key="tech">
+                            <span class="tech-tag" x-text="tech"></span>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- SSL Info -->
+                <div class="detail-section" x-show="Object.keys(selectedAsset?.ssl_info || {}).length > 0">
+                    <h4>SSL Certificate</h4>
+                    <dl>
+                        <dt>Issuer</dt><dd x-text="selectedAsset?.ssl_info?.issuer?.O || '—'"></dd>
+                        <dt>Subject</dt><dd x-text="selectedAsset?.ssl_info?.subject?.CN || '—'"></dd>
+                        <dt>TLS Version</dt><dd x-text="selectedAsset?.ssl_info?.tls_version || '—'"></dd>
+                        <dt>Expires In</dt><dd x-text="selectedAsset?.ssl_info?.days_until_expiry ? selectedAsset.ssl_info.days_until_expiry + ' days' : '—'"></dd>
+                        <dt>Expired</dt><dd><span class="badge" :class="selectedAsset?.ssl_info?.expired ? 'badge-failed' : 'badge-completed'" x-text="selectedAsset?.ssl_info?.expired ? 'Yes' : 'No'"></span></dd>
+                        <dt>Self-Signed</dt><dd><span class="badge" :class="selectedAsset?.ssl_info?.self_signed ? 'badge-failed' : 'badge-completed'" x-text="selectedAsset?.ssl_info?.self_signed ? 'Yes' : 'No'"></span></dd>
+                    </dl>
+                </div>
+
+                <!-- Geo Location -->
+                <div class="detail-section" x-show="Object.keys(selectedAsset?.geo_location || {}).length > 0">
+                    <h4>Geolocation</h4>
+                    <dl>
+                        <dt>Country</dt><dd x-text="selectedAsset?.geo_location?.country || '—'"></dd>
+                        <dt>City</dt><dd x-text="selectedAsset?.geo_location?.city || '—'"></dd>
+                        <dt>ASN</dt><dd x-text="selectedAsset?.geo_location?.asn || '—'"></dd>
+                        <dt>Organization</dt><dd x-text="selectedAsset?.geo_location?.org || '—'"></dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assets Table -->
+    <div class="panel">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Value</th>
+                    <th>Risk</th>
+                    <th>Source</th>
+                    <th>Last Seen</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-if="assets.length === 0">
+                    <tr><td colspan="7" class="empty-cell">
+                        No assets discovered yet. Select a target and run reconnaissance.
+                    </td></tr>
+                </template>
+                <template x-for="asset in assets" :key="asset.id">
+                    <tr :class="{ 'risky-row': asset.risk_score >= 50 }">
+                        <td>
+                            <span class="asset-name" x-text="asset.name"></span>
+                            <div class="asset-meta" x-show="asset.technologies?.length > 0">
+                                <template x-for="tech in asset.technologies.slice(0, 3)" :key="tech">
+                                    <span class="micro-tag" x-text="tech"></span>
+                                </template>
+                            </div>
+                        </td>
+                        <td><span class="tag tag-asset" :class="'type-' + asset.asset_type" x-text="asset.asset_type"></span></td>
+                        <td><code class="asset-value" x-text="asset.value.length > 40 ? asset.value.substring(0, 40) + '...' : asset.value"></code></td>
+                        <td>
+                            <div class="mini-risk-bar">
+                                <div class="mini-risk-fill" :style="'width:' + asset.risk_score + '%'" :class="'risk-' + Math.floor(asset.risk_score / 25)"></div>
+                            </div>
+                            <span class="mini-risk-text" x-text="asset.risk_score.toFixed(0)"></span>
+                        </td>
+                        <td><span class="micro-tag" x-text="asset.source"></span></td>
+                        <td x-text="asset.last_seen ? new Date(asset.last_seen).toLocaleDateString() : '—'"></td>
+                        <td>
+                            <button class="btn btn-sm" @click="viewAsset(asset)">Details</button>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function assetsApp() {
+    return {
+        assets: [],
+        targets: [],
+        stats: { total_assets: 0, high_risk_assets: 0, by_type: {} },
+        selectedTarget: '',
+        selectedAsset: null,
+        showReconModal: false,
+        reconning: false,
+        reconConfig: { scan_depth: 'standard' },
+
+        async initAssets() {
+            await this.loadTargets();
+            await this.loadAssets();
+        },
+
+        async loadTargets() {
+            try {
+                const res = await fetch('/api/v1/targets');
+                this.targets = await res.json();
+            } catch (e) {
+                $store.toasts.add('Failed to load targets', 'error');
+            }
+        },
+
+        async loadAssets() {
+            try {
+                let url = '/api/v1/assets';
+                if (this.selectedTarget) {
+                    url += '?target_id=' + this.selectedTarget;
+                    await this.loadStats();
+                }
+                const res = await fetch(url);
+                this.assets = await res.json();
+            } catch (e) {
+                $store.toasts.add('Failed to load assets', 'error');
+            }
+        },
+
+        async loadStats() {
+            if (!this.selectedTarget) return;
+            try {
+                const res = await fetch('/api/v1/assets/stats/' + this.selectedTarget);
+                this.stats = await res.json();
+            } catch (e) {
+                console.error('Failed to load stats:', e);
+            }
+        },
+
+        selectedTargetName() {
+            const t = this.targets.find(t => t.id == this.selectedTarget);
+            return t ? t.name : '';
+        },
+
+        async startRecon() {
+            this.reconning = true;
+            try {
+                const res = await fetch('/api/v1/assets/recon', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        target_id: parseInt(this.selectedTarget),
+                        scan_depth: this.reconConfig.scan_depth
+                    })
+                });
+                if (res.ok) {
+                    $store.toasts.add('Reconnaissance started. Assets will appear shortly.', 'success');
+                    this.showReconModal = false;
+                    // Poll for new assets
+                    setTimeout(() => this.loadAssets(), 5000);
+                    setTimeout(() => this.loadAssets(), 15000);
+                } else {
+                    const err = await res.json();
+                    $store.toasts.add(err.detail || 'Recon failed', 'error');
+                }
+            } catch (e) {
+                $store.toasts.add('Network error', 'error');
+            } finally {
+                this.reconning = false;
+            }
+        },
+
+        viewAsset(asset) {
+            this.selectedAsset = asset;
+        }
+    }
+}
+</script>
+{% endblock %}

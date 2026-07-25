@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Threat Intelligence — QuadSeer{% endblock %}
+{% block content %}
+<div x-data="threatsApp()" x-init="initThreats()">
+    <header class="page-header">
+        <h1>Threat Intelligence</h1>
+        <div class="search-box">
+            <input type="text" x-model="searchQuery" @input.debounce.300ms="search()" placeholder="Search threat actors...">
+        </div>
+    </header>
+
+    <div class="stats-bar">
+        <span>Total Actors: <strong x-text="stats.total_actors"></strong></span>
+        <span>High Threat: <strong x-text="stats.high_threat_actors" class="text-danger"></strong></span>
+    </div>
+
+    <div class="threat-grid">
+        <template x-for="actor in actors" :key="actor.id">
+            <article class="threat-card-detailed">
+                <header>
+                    <h3 x-text="actor.name"></h3>
+                    <span class="threat-score" :class="'score-' + Math.floor(actor.threat_level)" x-text="actor.threat_level.toFixed(1)"></span>
+                </header>
+                <p class="threat-origin" x-text="actor.origin + ' • ' + actor.motivation"></p>
+                <p class="threat-desc" x-text="actor.description"></p>
+                <div class="threat-tags">
+                    <template x-for="target in actor.targets.slice(0, 3)" :key="target">
+                        <span class="tag" x-text="target"></span>
+                    </template>
+                </div>
+                <div class="threat-iocs" x-show="actor.iocs.length > 0">
+                    <small><strong>IOCs:</strong></small>
+                    <template x-for="ioc in actor.iocs.slice(0, 2)" :key="ioc.value">
+                        <code class="ioc-tag" x-text="ioc.type + ': ' + ioc.value.substring(0, 30) + (ioc.value.length > 30 ? '...' : '')"></code>
+                    </template>
+                </div>
+            </article>
+        </template>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function threatsApp() {
+    return {
+        actors: [],
+        stats: { total_actors: 0, high_threat_actors: 0 },
+        searchQuery: '',
+
+        async initThreats() {
+            await this.loadActors();
+            await this.loadStats();
+        },
+
+        async loadActors() {
+            try {
+                const url = this.searchQuery 
+                    ? `/api/v1/threats/actors?q=${encodeURIComponent(this.searchQuery)}`
+                    : '/api/v1/threats/actors';
+                const res = await fetch(url);
+                this.actors = await res.json();
+            } catch (e) {
+                $store.toasts.add('Failed to load threat actors', 'error');
+            }
+        },
+
+        async loadStats() {
+            try {
+                const res = await fetch('/api/v1/threats/stats');
+                this.stats = await res.json();
+            } catch (e) {
+                console.error('Failed to load stats:', e);
+            }
+        },
+
+        search() {
+            this.loadActors();
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,262 @@
+
+/* ===== ASSET INVENTORY STYLES ===== */
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.header-actions select {
+    min-width: 250px;
+}
+
+.stat-pill {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.75rem 1.25rem;
+    background: var(--qs-card-bg);
+    border-radius: 10px;
+    min-width: 80px;
+}
+
+.stat-pill.danger {
+    background: #f8d7da;
+}
+
+.stat-pill.danger .stat-number {
+    color: #721c24;
+}
+
+.stat-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--qs-primary);
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--qs-muted);
+    text-transform: uppercase;
+}
+
+/* Asset tags */
+.tag-asset {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.type-domain { background: #e3f2fd; color: #1565c0; }
+.type-subdomain { background: #f3e5f5; color: #7b1fa2; }
+.type-ip { background: #e8f5e9; color: #2e7d32; }
+.type-port { background: #fff3e0; color: #ef6c00; }
+.type-service { background: #fce4ec; color: #c2185b; }
+.type-certificate { background: #e0f2f1; color: #00695c; }
+.type-web_app { background: #e8eaf6; color: #303f9f; }
+.type-cloud_resource { background: #f1f8e9; color: #558b2f; }
+
+/* Risk indicators */
+.risky-row {
+    background: rgba(220, 53, 69, 0.04) !important;
+}
+
+.mini-risk-bar {
+    width: 60px;
+    height: 6px;
+    background: var(--qs-bg);
+    border-radius: 3px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 0.5rem;
+}
+
+.mini-risk-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s;
+}
+
+.mini-risk-fill.risk-0 { background: #28a745; }
+.mini-risk-fill.risk-1 { background: #ffc107; }
+.mini-risk-fill.risk-2 { background: #fd7e14; }
+.mini-risk-fill.risk-3 { background: #dc3545; }
+
+.mini-risk-text {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--qs-muted);
+}
+
+.asset-name {
+    font-weight: 600;
+    display: block;
+}
+
+.asset-meta {
+    margin-top: 0.25rem;
+}
+
+.micro-tag {
+    display: inline-block;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.65rem;
+    background: var(--qs-bg);
+    color: var(--qs-muted);
+    margin-right: 0.2rem;
+}
+
+.asset-value {
+    font-size: 0.8rem;
+}
+
+/* Modal large */
+.modal-lg {
+    max-width: 800px;
+}
+
+/* Asset detail */
+.asset-detail {
+    padding: 1.5rem;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.detail-section {
+    background: var(--qs-bg);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.detail-section h4 {
+    margin: 0 0 0.75rem;
+    font-size: 0.9rem;
+    color: var(--qs-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.detail-section dl {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 0.5rem 1rem;
+    margin: 0;
+}
+
+.detail-section dt {
+    color: var(--qs-muted);
+    font-size: 0.8rem;
+}
+
+.detail-section dd {
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+/* Risk meter */
+.risk-meter {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.risk-bar {
+    flex: 1;
+    height: 12px;
+    background: var(--qs-bg);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.risk-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.5s ease;
+}
+
+.risk-fill.risk-0 { background: linear-gradient(90deg, #28a745, #34ce57); }
+.risk-fill.risk-1 { background: linear-gradient(90deg, #ffc107, #ffdb4d); }
+.risk-fill.risk-2 { background: linear-gradient(90deg, #fd7e14, #ff9f43); }
+.risk-fill.risk-3 { background: linear-gradient(90deg, #dc3545, #ff6b6b); }
+
+.risk-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--qs-primary);
+    min-width: 60px;
+    text-align: right;
+}
+
+.risk-factors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.risk-tag {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    background: #f8d7da;
+    color: #721c24;
+    text-transform: capitalize;
+}
+
+/* Tech tags */
+.tech-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tech-tag {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    background: var(--qs-primary);
+    color: white;
+}
+
+/* Detail table */
+.detail-table {
+    width: 100%;
+    font-size: 0.85rem;
+}
+
+.detail-table th {
+    padding: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.detail-table td {
+    padding: 0.5rem;
+}
+
+.banner-cell {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: monospace;
+    font-size: 0.75rem;
+    color: var(--qs-muted);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .detail-grid { grid-template-columns: 1fr; }
+    .header-actions { flex-direction: column; align-items: stretch; }
+    .stats-bar { flex-wrap: wrap; }
+}

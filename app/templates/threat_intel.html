@@ -1,0 +1,58 @@
+{% extends "base.html" %}{% block title %}Threat Intelligence - QuadSeer{% endblock %}{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="threatIntel()" x-init="loadActors()">
+    <div class="flex items-center justify-between mb-8"><div><h1 class="text-3xl font-bold">Threat Intelligence</h1><p class="text-slate-400 mt-1">APT groups, IOCs, and YARA rules</p></div></div>
+    <div class="flex gap-2 mb-6">
+        <button @click="tab = 'actors'" :class="tab === 'actors' ? 'bg-primary-500/20 text-primary-400' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">Threat Actors</button>
+        <button @click="tab = 'iocs'" :class="tab === 'iocs' ? 'bg-primary-500/20 text-primary-400' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">IOCs</button>
+        <button @click="tab = 'yara'" :class="tab === 'yara' ? 'bg-primary-500/20 text-primary-400' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">YARA Rules</button>
+    </div>
+    <div class="glass rounded-2xl p-6">
+        <div x-show="tab === 'actors'" class="space-y-3">
+            <template x-for="actor in actors" :key="actor.id">
+                <div class="p-4 rounded-xl bg-slate-900/50">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold text-lg" x-text="actor.name"></h3>
+                        <span x-show="actor.mitre_group_id" class="px-2 py-1 rounded bg-primary-500/10 text-primary-400 text-xs font-mono" x-text="actor.mitre_group_id"></span>
+                    </div>
+                    <p class="text-sm text-slate-400 mb-2" x-text="actor.description || 'No description'"></p>
+                    <div class="flex flex-wrap gap-2 text-xs">
+                        <span x-show="actor.country" class="px-2 py-1 rounded bg-slate-800 text-slate-400"><i class="fas fa-flag mr-1"></i><span x-text="actor.country"></span></span>
+                        <span x-show="actor.motivation" class="px-2 py-1 rounded bg-slate-800 text-slate-400" x-text="actor.motivation"></span>
+                        <span x-show="actor.sophistication" class="px-2 py-1 rounded bg-slate-800 text-slate-400" x-text="actor.sophistication"></span>
+                    </div>
+                </div>
+            </template>
+        </div>
+        <div x-show="tab === 'iocs'" class="space-y-3">
+            <div class="flex gap-2 mb-4">
+                <input x-model="iocSearch" @input="loadIOCs()" type="text" placeholder="Search IOCs..." class="flex-1 px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-primary-500 outline-none">
+            </div>
+            <template x-for="ioc in iocs" :key="ioc.id">
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/50">
+                    <div>
+                        <div class="font-mono text-sm" x-text="ioc.value"></div>
+                        <div class="text-xs text-slate-500"><span class="uppercase" x-text="ioc.ioc_type"></span> &bull; Confidence: <span x-text="ioc.confidence"></span></div>
+                    </div>
+                    <span class="px-2 py-1 rounded text-xs" :class="ioc.confidence === 'high' ? 'bg-red-500/10 text-red-400' : 'bg-yellow-500/10 text-yellow-400'" x-text="ioc.confidence"></span>
+                </div>
+            </template>
+        </div>
+        <div x-show="tab === 'yara'" class="space-y-3">
+            <template x-for="rule in yaraRules" :key="rule.id">
+                <div class="p-4 rounded-xl bg-slate-900/50">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold" x-text="rule.name"></h3>
+                        <span class="text-xs text-slate-500" x-text="rule.match_count + ' matches'"></span>
+                    </div>
+                    <p class="text-sm text-slate-400 mb-2" x-text="rule.description || 'No description'"></p>
+                    <div class="flex flex-wrap gap-1">
+                        <template x-for="tag in rule.tags" :key="tag">
+                            <span class="px-2 py-0.5 rounded bg-slate-800 text-xs text-slate-400" x-text="tag"></span>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</div>
+{% block scripts %}<script>function threatIntel(){return{tab:'actors',actors:[],iocs:[],yaraRules:[],iocSearch:'',async loadActors(){try{const r=await this.apiCall('/api/threat-intel/actors');if(r.ok)this.actors=await r.json()}catch(e){}},async loadIOCs(){try{let url='/api/threat-intel/iocs';if(this.iocSearch)url+='?search='+encodeURIComponent(this.iocSearch);const r=await this.apiCall(url);if(r.ok)this.iocs=await r.json()}catch(e){}},async loadYara(){try{const r=await this.apiCall('/api/threat-intel/yara-rules');if(r.ok)this.yaraRules=await r.json()}catch(e){}}}}}</script>{% endblock %}

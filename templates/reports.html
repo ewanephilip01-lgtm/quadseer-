@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Reports — QuadSeer{% endblock %}
+{% block content %}
+<div x-data="reportsApp()" x-init="initReports()">
+    <header class="page-header">
+        <h1>Reports</h1>
+        <button class="btn btn-primary" @click="showNewReport = true">+ Generate Report</button>
+    </header>
+
+    <div class="panel">
+        <table>
+            <thead>
+                <tr><th>Title</th><th>Format</th><th>Status</th><th>Generated</th><th>Size</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+                <template x-if="reports.length === 0">
+                    <tr><td colspan="6" class="empty-cell">No reports generated yet.</td></tr>
+                </template>
+                <template x-for="report in reports" :key="report.id">
+                    <tr>
+                        <td x-text="report.title"></td>
+                        <td><span class="tag tag-upper" x-text="report.format"></span></td>
+                        <td>
+                            <span class="badge" :class="report.generated_at ? 'badge-completed' : 'badge-pending'" 
+                                  x-text="report.generated_at ? 'Ready' : 'Generating...'"></span>
+                        </td>
+                        <td x-text="report.generated_at ? new Date(report.generated_at).toLocaleDateString() : '—'"></td>
+                        <td x-text="report.file_size ? (report.file_size / 1024).toFixed(1) + ' KB' : '—'"></td>
+                        <td>
+                            <a x-show="report.file_path" :href="report.file_path" class="btn btn-sm" download>Download</a>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function reportsApp() {
+    return {
+        reports: [],
+        showNewReport: false,
+
+        async initReports() {
+            await this.loadReports();
+        },
+
+        async loadReports() {
+            try {
+                const res = await fetch('/api/v1/reports');
+                this.reports = await res.json();
+            } catch (e) {
+                $store.toasts.add('Failed to load reports', 'error');
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Reports - QuadSeer{% endblock %}
+{% block content %}
+<div x-data="reportsData()" x-init="loadScans()">
+    <h1 style="margin-bottom: 1.5rem;">Reports</h1>
+
+    <div class="card">
+        <table>
+            <thead>
+                <tr><th>Scan ID</th><th>Target</th><th>Scan Type</th><th>Findings</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+                <template x-for="scan in completedScans" :key="scan.id">
+                    <tr>
+                        <td x-text="scan.id"></td>
+                        <td x-text="scan.target_domain || 'Unknown'"></td>
+                        <td x-text="scan.scan_type"></td>
+                        <td x-text="scan.total_findings"></td>
+                        <td>
+                            <a :href="'/api/v1/reports/' + scan.id + '/download'" class="btn btn-primary" style="padding: 0.3rem 0.8rem; font-size: 0.8rem;">Download PDF</a>
+                            <button @click="viewMetadata(scan.id)" class="btn btn-secondary" style="padding: 0.3rem 0.8rem; font-size: 0.8rem; margin-left: 0.3rem;">Metadata</button>
+                        </td>
+                    </tr>
+                </template>
+                <tr x-show="completedScans.length === 0">
+                    <td colspan="5" style="text-align: center; color: #8899aa;">No completed scans available for reporting.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div x-show="showMetadata" class="card" style="margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3>Report Metadata</h3>
+            <button @click="showMetadata = false" class="btn btn-secondary">Close</button>
+        </div>
+        <pre style="background: var(--primary); padding: 1rem; border-radius: 6px; overflow-x: auto;" x-text="JSON.stringify(metadata, null, 2)"></pre>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function reportsData() {
+    return {
+        completedScans: [],
+        showMetadata: false,
+        metadata: {},
+        token: localStorage.getItem('token'),
+        loadScans() {
+            if (!this.token) { window.location.href = '/login'; return; }
+            fetch('/api/v1/scans/', { headers: { 'Authorization': 'Bearer ' + this.token } })
+            .then(r => r.json())
+            .then(data => {
+                this.completedScans = data.filter(s => s.status === 'completed');
+            });
+        },
+        viewMetadata(id) {
+            fetch('/api/v1/reports/' + id + '/metadata', { headers: { 'Authorization': 'Bearer ' + this.token } })
+            .then(r => r.json())
+            .then(data => {
+                this.metadata = data;
+                this.showMetadata = true;
+            });
+        }
+    }
+}
+</script>
+{% endblock %}

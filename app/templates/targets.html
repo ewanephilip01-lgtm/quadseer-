@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Targets - QuadSeer{% endblock %}
+{% block content %}
+<div x-data="targetsPage()" x-init="init()">
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="text-3xl font-bold">Targets</h1>
+            <p class="text-slate-400">Monitor your digital assets</p>
+        </div>
+        <button @click="showAdd = true" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg font-medium transition">
+            <i class="fas fa-plus mr-2"></i>Add Target
+        </button>
+    </div>
+
+    <!-- Add Target Modal -->
+    <div x-show="showAdd" x-cloak class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" @click.self="showAdd = false">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-lg">
+            <h2 class="text-xl font-bold mb-4">Add New Target</h2>
+            <form @submit.prevent="addTarget()" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">Name</label>
+                    <input type="text" x-model="newTarget.name" required
+                           class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 outline-none focus:border-blue-500"
+                           placeholder="Example Corporation">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">Domain</label>
+                    <input type="text" x-model="newTarget.domain" required
+                           class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 outline-none focus:border-blue-500"
+                           placeholder="example.com">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">Description</label>
+                    <textarea x-model="newTarget.description" rows="2"
+                              class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 outline-none focus:border-blue-500"
+                              placeholder="Optional description..."></textarea>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" @click="showAdd = false" class="flex-1 bg-slate-700 hover:bg-slate-600 py-2 rounded-lg transition">Cancel</button>
+                    <button type="submit" :disabled="adding"
+                            class="flex-1 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 py-2 rounded-lg transition flex items-center justify-center gap-2">
+                        <div x-show="adding" class="spinner w-4 h-4 border-2"></div>
+                        <span x-text="adding ? 'Adding...' : 'Add Target'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Targets Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <template x-if="targets.length === 0">
+            <div class="col-span-full bg-slate-800 border border-slate-700 rounded-xl p-12 text-center">
+                <i class="fas fa-bullseye text-slate-600 text-4xl mb-4"></i>
+                <p class="text-slate-400">No targets yet. Add your first target to start monitoring.</p>
+            </div>
+        </template>
+        <template x-for="target in targets" :key="target.id">
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:border-blue-500/50 transition group">
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-900/50 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-globe text-blue-400"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold" x-text="target.name"></h3>
+                            <p class="text-sm text-slate-400" x-text="target.domain"></p>
+                        </div>
+                    </div>
+                    <div class="opacity-0 group-hover:opacity-100 transition">
+                        <button @click="deleteTarget(target.id)" class="text-red-400 hover:text-red-300 p-1"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+                <p class="text-sm text-slate-500 mb-4 line-clamp-2" x-text="target.description || 'No description'"></p>
+                <div class="flex gap-2">
+                    <button @click="quickScan(target.id, 'breach')" class="flex-1 bg-slate-700 hover:bg-slate-600 text-xs py-2 rounded-lg transition">
+                        <i class="fas fa-database mr-1"></i>Breach
+                    </button>
+                    <button @click="quickScan(target.id, 'ransomware')" class="flex-1 bg-slate-700 hover:bg-slate-600 text-xs py-2 rounded-lg transition">
+                        <i class="fas fa-virus mr-1"></i>Ransomware
+                    </button>
+                    <button @click="quickScan(target.id, 'darkweb')" class="flex-1 bg-slate-700 hover:bg-slate-600 text-xs py-2 rounded-lg transition">
+                        <i class="fas fa-mask mr-1"></i>Dark Web
+                    </button>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>
+
+<script>
+function targetsPage() {
+    return {
+        targets: [],
+        showAdd: false,
+        adding: false,
+        newTarget: { name: '', domain: '', description: '' },
+
+        async init() {
+            await this.loadTargets();
+        },
+
+        async loadTargets() {
+            this.targets = await this.api('GET', '/api/v1/targets/');
+        },
+
+        async addTarget() {
+            this.adding = true;
+            try {
+                await this.api('POST', '/api/v1/targets/', this.newTarget);
+                this.showAdd = false;
+                this.newTarget = { name: '', domain: '', description: '' };
+                await this.loadTargets();
+                this.showToast?.('Target added successfully', 'success');
+            } catch (e) {} finally {
+                this.adding = false;
+            }
+        },
+
+        async deleteTarget(id) {
+            if (!confirm('Delete this target?')) return;
+            try {
+                await this.api('DELETE', `/api/v1/targets/${id}`);
+                await this.loadTargets();
+            } catch (e) {}
+        },
+
+        async quickScan(targetId, type) {
+            try {
+                await this.api('POST', '/api/v1/scans/', { target_id: targetId, scan_type: type });
+                this.showToast?.(`${type} scan queued`, 'success');
+            } catch (e) {}
+        }
+    }
+}
+</script>
+{% endblock %}

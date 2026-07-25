@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - QuadSeer{% endblock %}
+{% block content %}
+<div x-data="dashboard()" x-init="init()">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold mb-2">Threat Intelligence Dashboard</h1>
+        <p class="text-slate-400">Real-time overview of your attack surface and threat landscape</p>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-slate-400 text-sm">Total Targets</p>
+                    <p class="text-3xl font-bold text-blue-400" x-text="stats.targets">0</p>
+                </div>
+                <i class="fas fa-bullseye text-slate-600 text-2xl"></i>
+            </div>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-slate-400 text-sm">Scans Run</p>
+                    <p class="text-3xl font-bold text-emerald-400" x-text="stats.scans">0</p>
+                </div>
+                <i class="fas fa-radar text-slate-600 text-2xl"></i>
+            </div>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-slate-400 text-sm">Critical Findings</p>
+                    <p class="text-3xl font-bold text-red-400" x-text="stats.critical">0</p>
+                </div>
+                <i class="fas fa-triangle-exclamation text-slate-600 text-2xl"></i>
+            </div>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-slate-400 text-sm">Risk Score</p>
+                    <p class="text-3xl font-bold" :class="stats.riskScore > 70 ? 'text-red-400' : stats.riskScore > 40 ? 'text-amber-400' : 'text-emerald-400'" x-text="stats.riskScore">0</p>
+                </div>
+                <i class="fas fa-gauge-high text-slate-600 text-2xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Findings -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+            <h2 class="text-lg font-semibold"><i class="fas fa-list-ul mr-2 text-blue-400"></i>Recent Critical Findings</h2>
+            <a href="/scans" class="text-sm text-blue-400 hover:text-blue-300">View all <i class="fas fa-arrow-right ml-1"></i></a>
+        </div>
+        <div class="divide-y divide-slate-700">
+            <template x-if="findings.length === 0">
+                <div class="px-6 py-12 text-center text-slate-500">
+                    <i class="fas fa-clipboard-check text-4xl mb-3"></i>
+                    <p>No findings yet. Run your first scan to get started.</p>
+                    <a href="/targets" class="inline-block mt-4 bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm">Add Target</a>
+                </div>
+            </template>
+            <template x-for="finding in findings" :key="finding.id">
+                <div class="px-6 py-4 flex items-center gap-4 hover:bg-slate-750 transition">
+                    <div class="w-2 h-2 rounded-full"
+                         :class="finding.severity === 'critical' ? 'bg-red-500' : finding.severity === 'high' ? 'bg-orange-500' : finding.severity === 'medium' ? 'bg-amber-500' : 'bg-blue-500'"></div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-medium truncate" x-text="finding.title"></p>
+                        <p class="text-sm text-slate-400 truncate" x-text="finding.description"></p>
+                    </div>
+                    <span class="text-xs px-2 py-1 rounded-full border"
+                          :class="finding.severity === 'critical' ? 'bg-red-900/50 border-red-700 text-red-300' : finding.severity === 'high' ? 'bg-orange-900/50 border-orange-700 text-orange-300' : 'bg-slate-700 border-slate-600 text-slate-300'"
+                          x-text="finding.severity.toUpperCase()"></span>
+                    <span class="text-xs text-slate-500" x-text="finding.source"></span>
+                </div>
+            </template>
+        </div>
+    </div>
+</div>
+
+<script>
+function dashboard() {
+    return {
+        stats: { targets: 0, scans: 0, critical: 0, riskScore: 0 },
+        findings: [],
+
+        async init() {
+            await this.loadStats();
+            await this.loadFindings();
+        },
+
+        async loadStats() {
+            try {
+                const targets = await this.api('GET', '/api/v1/targets/');
+                this.stats.targets = targets.length;
+
+                const scans = await this.api('GET', '/api/v1/scans/');
+                this.stats.scans = scans.length;
+
+                // Calculate risk from findings
+                let totalRisk = 0;
+                let criticalCount = 0;
+                for (const scan of scans) {
+                    if (scan.results_summary) {
+                        criticalCount += scan.results_summary.critical || 0;
+                        totalRisk += scan.results_summary.total_risk || 0;
+                    }
+                }
+                this.stats.critical = criticalCount;
+                this.stats.riskScore = Math.min(Math.round(totalRisk / Math.max(targets.length, 1)), 100);
+            } catch (e) {}
+        },
+
+        async loadFindings() {
+            try {
+                const scans = await this.api('GET', '/api/v1/scans/?limit=10');
+                const allFindings = [];
+                for (const scan of scans.slice(0, 3)) {
+                    const findings = await this.api('GET', `/api/v1/scans/${scan.id}/results`);
+                    allFindings.push(...findings);
+                }
+                this.findings = allFindings
+                    .sort((a, b) => b.risk_score - a.risk_score)
+                    .slice(0, 10);
+            } catch (e) {}
+        }
+    }
+}
+</script>
+{% endblock %}

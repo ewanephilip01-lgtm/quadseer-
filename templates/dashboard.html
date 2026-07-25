@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — QUADSEER{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <h1 class="text-2xl font-bold text-white mb-6">Dashboard</h1>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <p class="text-slate-400 text-sm">Targets</p>
+            <p class="text-3xl font-bold text-white mt-1">{{ stats.targets }}</p>
+        </div>
+        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <p class="text-slate-400 text-sm">Total Scans</p>
+            <p class="text-3xl font-bold text-cyan-400 mt-1">{{ stats.total_scans }}</p>
+        </div>
+        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <p class="text-slate-400 text-sm">Findings</p>
+            <p class="text-3xl font-bold text-amber-400 mt-1">{{ stats.findings }}</p>
+        </div>
+        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <p class="text-slate-400 text-sm">Critical / High</p>
+            <p class="text-3xl font-bold text-red-400 mt-1">{{ stats.critical_high }}</p>
+        </div>
+    </div>
+
+    <!-- Scan Type Breakdown -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 p-6 mb-8">
+        <h2 class="text-lg font-semibold text-white mb-4">Scan Activity</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {% for stype, count in stats.scan_types.items() %}
+            <div class="bg-slate-700/50 rounded-lg p-3 text-center">
+                <p class="text-xs text-slate-400 uppercase tracking-wide">{{ stype|replace('_', ' ')|title }}</p>
+                <p class="text-xl font-bold text-white">{{ count }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Recent Scans -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-white">Recent Scans</h2>
+            <a href="/scans/new" class="text-sm text-cyan-400 hover:text-cyan-300">+ New Scan</a>
+        </div>
+        <div class="divide-y divide-slate-700/50">
+            {% for scan in recent_scans %}
+            <a href="/scans/{{ scan.id }}" class="block px-6 py-4 hover:bg-slate-700/30 transition-colors">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-white font-medium">{{ scan.scan_type|title }}</p>
+                        <p class="text-slate-500 text-sm">{{ scan.target.target }} · {{ scan.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                    </div>
+                    <span class="px-2 py-1 rounded text-xs font-semibold
+                        {% if scan.status.value == 'completed' %}bg-green-900/40 text-green-400
+                        {% elif scan.status.value == 'failed' %}bg-red-900/40 text-red-400
+                        {% elif scan.status.value == 'running' %}bg-amber-900/40 text-amber-400
+                        {% else %}bg-slate-700 text-slate-400{% endif %}">
+                        {{ scan.status.value|upper }}
+                    </span>
+                </div>
+            </a>
+            {% else %}
+            <div class="px-6 py-8 text-center text-slate-500">
+                No scans yet. <a href="/scans/new" class="text-cyan-400">Launch your first scan →</a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

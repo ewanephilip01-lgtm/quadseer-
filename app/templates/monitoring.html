@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% block title %}Monitoring - QuadSeer{% endblock %}{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="monitoring()" x-init="loadMonitors()">
+    <div class="flex items-center justify-between mb-8">
+        <div><h1 class="text-3xl font-bold">Continuous Monitoring</h1><p class="text-slate-400 mt-1">Auto-scan your assets on schedule</p></div>
+    </div>
+    <div class="glass rounded-2xl p-6 mb-8" x-data="{ name: '', target: '', monitorType: 'domain', interval: 'daily', notifyEmail: true, notifySlack: false, slackWebhook: '', creating: false }">
+        <h3 class="text-lg font-semibold mb-4">Create Monitor</h3>
+        <form @submit.prevent="createMonitor()" class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <input x-model="name" type="text" required placeholder="Monitor name" class="px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-primary-500 outline-none">
+            <input x-model="target" type="text" required placeholder="Target domain/IP" class="px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-primary-500 outline-none">
+            <select x-model="monitorType" class="px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-primary-500 outline-none">
+                <option value="domain">Domain</option><option value="ip">IP Address</option><option value="brand">Brand</option><option value="credential">Credential</option>
+            </select>
+            <select x-model="interval" class="px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-primary-500 outline-none">
+                <option value="hourly">Hourly</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>
+            </select>
+            <div class="md:col-span-2 lg:col-span-4 flex flex-wrap gap-4 items-center">
+                <label class="flex items-center gap-2 text-sm"><input type="checkbox" x-model="notifyEmail" class="rounded bg-slate-900 border-slate-700"> Email alerts</label>
+                <label class="flex items-center gap-2 text-sm"><input type="checkbox" x-model="notifySlack" class="rounded bg-slate-900 border-slate-700"> Slack alerts</label>
+                <input x-show="notifySlack" x-model="slackWebhook" type="text" placeholder="Slack webhook URL" class="flex-1 px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-primary-500 outline-none">
+                <button type="submit" :disabled="creating" class="px-6 py-2 bg-gradient-to-r from-primary-500 to-accent-500 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-50"><i class="fas fa-plus mr-2"></i>Create</button>
+            </div>
+        </form>
+    </div>
+    <div class="glass rounded-2xl p-6">
+        <h3 class="text-lg font-semibold mb-4">Active Monitors</h3>
+        <div class="space-y-3">
+            <template x-for="monitor in monitors" :key="monitor.id">
+                <div class="flex items-center justify-between p-4 rounded-xl bg-slate-900/50 hover:bg-slate-800/50 transition">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" :class="monitor.is_active ? 'bg-emerald-500/10' : 'bg-slate-500/10'">
+                            <i class="fas" :class="monitor.is_active ? 'fa-heart-pulse text-emerald-400' : 'fa-pause text-slate-400'"></i>
+                        </div>
+                        <div>
+                            <div class="font-medium" x-text="monitor.name"></div>
+                            <div class="text-xs text-slate-500"><span x-text="monitor.target"></span> &bull; <span class="capitalize" x-text="monitor.interval"></span></div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button @click="triggerRun(monitor.id)" class="px-3 py-1.5 rounded-lg bg-primary-500/10 text-primary-400 text-sm hover:bg-primary-500/20 transition">Run Now</button>
+                        <button @click="deleteMonitor(monitor.id)" class="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-sm hover:bg-red-500/20 transition"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            </template>
+            <div x-show="monitors.length === 0" class="text-center text-slate-500 py-12"><i class="fas fa-heart-pulse text-4xl mb-3 opacity-30"></i><p>No monitors yet</p></div>
+        </div>
+    </div>
+</div>
+{% block scripts %}<script>function monitoring(){return{monitors:[],async loadMonitors(){try{const r=await this.apiCall('/api/monitors/');if(r.ok)this.monitors=await r.json()}catch(e){}},async createMonitor(){const d=document.querySelector('[x-data*="name"]')._x_dataStack[0];try{const r=await this.apiCall('/api/monitors/',{method:'POST',body:JSON.stringify({name:d.name,target:d.target,monitor_type:d.monitorType,interval:d.interval,notify_email:d.notifyEmail,notify_slack:d.notifySlack,slack_webhook_url:d.slackWebhook})});if(r.ok){window.dispatchEvent(new CustomEvent('toast',{detail:{id:Date.now(),type:'success',message:'Monitor created!'}}));this.loadMonitors();d.name='';d.target=''}}catch(e){}},async triggerRun(id){try{await this.apiCall(`/api/monitors/${id}/run`,{method:'POST'});window.dispatchEvent(new CustomEvent('toast',{detail:{id:Date.now(),type:'success',message:'Monitor run queued!'}}))}catch(e){}},async deleteMonitor(id){if(!confirm('Delete this monitor?'))return;try{await this.apiCall(`/api/monitors/${id}`,{method:'DELETE'});this.loadMonitors()}catch(e){}}}}</script>{% endblock %}

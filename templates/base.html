@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en" x-data="{ sidebarOpen: false, currentPage: '{{ current_page|default("dashboard") }}' }">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}QuadSeer{% endblock %}</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/quadseer.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    {% include "partials/navbar.html" %}
+    <div class="container-fluid">
+        <div class="grid">
+            <aside class="sidebar" :class="{ 'open': sidebarOpen }">
+                {% include "partials/sidebar.html" %}
+            </aside>
+            <main class="main-content">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+    {% include "partials/toast.html" %}
+    <script src="{{ url_for('static', path='/js/quadseer.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

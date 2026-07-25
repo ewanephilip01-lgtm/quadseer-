@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}QuadSeer - Threat Intelligence & Attack Surface Management{% endblock %}
+{% block content %}
+<!-- Hero Section -->
+<div class="relative overflow-hidden">
+    <div class="absolute inset-0 bg-gradient-to-br from-primary-600/10 via-transparent to-accent-600/10"></div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16 relative">
+        <div class="text-center">
+            <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-500/10 border border-primary-500/20 text-primary-400 text-sm font-medium mb-6">
+                <span class="w-2 h-2 rounded-full bg-primary-400 animate-pulse"></span>
+                v3.0 Now Available
+            </div>
+            <h1 class="text-5xl md:text-7xl font-bold mb-6 leading-tight">
+                See Threats Before<br><span class="gradient-text">They See You</span>
+            </h1>
+            <p class="text-xl text-slate-400 max-w-2xl mx-auto mb-10">
+                QuadSeer delivers enterprise-grade threat intelligence, attack surface management, and dark web monitoring — all in one platform.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="/register" class="px-8 py-4 bg-gradient-to-r from-primary-500 to-accent-500 rounded-xl font-semibold hover:opacity-90 transition shadow-lg shadow-primary-500/25">
+                    Start Free Trial
+                </a>
+                <a href="/pricing" class="px-8 py-4 rounded-xl font-semibold border border-slate-700 hover:bg-slate-800 transition">
+                    View Pricing
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Features Grid -->
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="text-center mb-16">
+        <h2 class="text-3xl font-bold mb-4">Complete Threat Visibility</h2>
+        <p class="text-slate-400">Everything you need to protect your digital footprint</p>
+    </div>
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="glass rounded-2xl p-6 card-hover">
+            <div class="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center mb-4">
+                <i class="fas fa-bullseye text-red-400 text-xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">Attack Surface Management</h3>
+            <p class="text-slate-400 text-sm">Discover and monitor all internet-facing assets with automated port scanning and service detection.</p>
+        </div>
+        <div class="glass rounded-2xl p-6 card-hover">
+            <div class="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mb-4">
+                <i class="fas fa-trademark text-amber-400 text-xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">Brand Protection</h3>
+            <p class="text-slate-400 text-sm">Detect typosquatting, phishing domains, and brand impersonation across the web.</p>
+        </div>
+        <div class="glass rounded-2xl p-6 card-hover">
+            <div class="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mb-4">
+                <i class="fas fa-key text-purple-400 text-xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">Credential Leak Detection</h3>
+            <p class="text-slate-400 text-sm">Monitor breach databases and dark web forums for exposed credentials.</p>
+        </div>
+        <div class="glass rounded-2xl p-6 card-hover">
+            <div class="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-4">
+                <i class="fas fa-globe text-emerald-400 text-xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">Dark Web Monitoring</h3>
+            <p class="text-slate-400 text-sm">Track mentions of your organization across dark web forums and marketplaces.</p>
+        </div>
+        <div class="glass rounded-2xl p-6 card-hover">
+            <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-4">
+                <i class="fas fa-brain text-blue-400 text-xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">Threat Intelligence</h3>
+            <p class="text-slate-400 text-sm">APT group tracking, IOC feeds, and YARA rules for advanced threat detection.</p>
+        </div>
+        <div class="glass rounded-2xl p-6 card-hover">
+            <div class="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center mb-4">
+                <i class="fas fa-file-pdf text-cyan-400 text-xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">Report Generation</h3>
+            <p class="text-slate-400 text-sm">Export findings as PDF, CSV, JSON, or Markdown with customizable templates.</p>
+        </div>
+    </div>
+</div>
+
+<!-- MITRE Section -->
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 border-t border-slate-800">
+    <div class="grid lg:grid-cols-2 gap-12 items-center">
+        <div>
+            <h2 class="text-3xl font-bold mb-4">MITRE ATT&CK Mapped</h2>
+            <p class="text-slate-400 mb-6">Every finding is mapped to the MITRE ATT&CK framework, giving you actionable intelligence aligned with industry standards.</p>
+            <ul class="space-y-3">
+                <li class="flex items-center gap-3"><i class="fas fa-check-circle text-primary-400"></i><span>Tactics and techniques identification</span></li>
+                <li class="flex items-center gap-3"><i class="fas fa-check-circle text-primary-400"></i><span>Threat actor attribution</span></li>
+                <li class="flex items-center gap-3"><i class="fas fa-check-circle text-primary-400"></i><span>Defensive recommendations</span></li>
+                <li class="flex items-center gap-3"><i class="fas fa-check-circle text-primary-400"></i><span>Continuous framework updates</span></li>
+            </ul>
+        </div>
+        <div class="glass rounded-2xl p-8">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-slate-900 rounded-xl p-4 text-center">
+                    <div class="text-3xl font-bold text-red-400">TA0001</div>
+                    <div class="text-sm text-slate-400 mt-1">Initial Access</div>
+                </div>
+                <div class="bg-slate-900 rounded-xl p-4 text-center">
+                    <div class="text-3xl font-bold text-orange-400">TA0002</div>
+                    <div class="text-sm text-slate-400 mt-1">Execution</div>
+                </div>
+                <div class="bg-slate-900 rounded-xl p-4 text-center">
+                    <div class="text-3xl font-bold text-yellow-400">TA0003</div>
+                    <div class="text-sm text-slate-400 mt-1">Persistence</div>
+                </div>
+                <div class="bg-slate-900 rounded-xl p-4 text-center">
+                    <div class="text-3xl font-bold text-green-400">TA0004</div>
+                    <div class="text-sm text-slate-400 mt-1">Privilege Escalation</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CTA -->
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="glass rounded-3xl p-12 text-center relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-r from-primary-500/10 to-accent-500/10"></div>
+        <div class="relative">
+            <h2 class="text-3xl font-bold mb-4">Ready to Secure Your Attack Surface?</h2>
+            <p class="text-slate-400 mb-8 max-w-xl mx-auto">Join thousands of security teams using QuadSeer to stay ahead of threats.</p>
+            <a href="/register" class="inline-block px-8 py-4 bg-gradient-to-r from-primary-500 to-accent-500 rounded-xl font-semibold hover:opacity-90 transition shadow-lg">
+                Get Started Free
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

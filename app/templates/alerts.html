@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% block title %}Alerts - QuadSeer{% endblock %}{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="alerts()" x-init="loadRules()">
+    <div class="flex items-center justify-between mb-8"><div><h1 class="text-3xl font-bold">Alert Rules</h1><p class="text-slate-400 mt-1">Configure notification channels</p></div></div>
+    <div class="glass rounded-2xl p-6 mb-8" x-data="{ name: '', description: '', minSeverity: 'medium', channelEmail: true, channelSlack: false, emailRecipients: '', slackWebhook: '', creating: false }">
+        <h3 class="text-lg font-semibold mb-4">New Alert Rule</h3>
+        <form @submit.prevent="createRule()" class="grid md:grid-cols-2 gap-4">
+            <input x-model="name" type="text" required placeholder="Rule name" class="px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-primary-500 outline-none">
+            <input x-model="description" type="text" placeholder="Description" class="px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-primary-500 outline-none">
+            <select x-model="minSeverity" class="px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-primary-500 outline-none">
+                <option value="critical">Critical only</option><option value="high">High+</option><option value="medium">Medium+</option><option value="low">Low+</option>
+            </select>
+            <div class="flex gap-4 items-center">
+                <label class="flex items-center gap-2 text-sm"><input type="checkbox" x-model="channelEmail" class="rounded bg-slate-900 border-slate-700"> Email</label>
+                <label class="flex items-center gap-2 text-sm"><input type="checkbox" x-model="channelSlack" class="rounded bg-slate-900 border-slate-700"> Slack</label>
+            </div>
+            <input x-show="channelEmail" x-model="emailRecipients" type="text" placeholder="Email addresses (comma-separated)" class="px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-primary-500 outline-none">
+            <input x-show="channelSlack" x-model="slackWebhook" type="text" placeholder="Slack webhook URL" class="px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-primary-500 outline-none">
+            <div class="md:col-span-2"><button type="submit" :disabled="creating" class="px-6 py-3 bg-gradient-to-r from-primary-500 to-accent-500 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-50"><i class="fas fa-plus mr-2"></i>Create Rule</button></div>
+        </form>
+    </div>
+    <div class="glass rounded-2xl p-6">
+        <h3 class="text-lg font-semibold mb-4">Your Rules</h3>
+        <div class="space-y-3">
+            <template x-for="rule in rules" :key="rule.id">
+                <div class="flex items-center justify-between p-4 rounded-xl bg-slate-900/50">
+                    <div>
+                        <div class="font-medium" x-text="rule.name"></div>
+                        <div class="text-xs text-slate-500"><span x-text="rule.min_severity"></span>+ &bull; <span x-text="rule.channel_email ? 'Email' : ''"></span><span x-text="rule.channel_slack ? ' Slack' : ''"></span></div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button @click="testRule(rule.id)" class="px-3 py-1.5 rounded-lg bg-primary-500/10 text-primary-400 text-sm hover:bg-primary-500/20 transition">Test</button>
+                        <button @click="deleteRule(rule.id)" class="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-sm hover:bg-red-500/20 transition"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            </template>
+            <div x-show="rules.length === 0" class="text-center text-slate-500 py-12"><i class="fas fa-bell text-4xl mb-3 opacity-30"></i><p>No alert rules yet</p></div>
+        </div>
+    </div>
+</div>
+{% block scripts %}<script>function alerts(){return{rules:[],async loadRules(){try{const r=await this.apiCall('/api/alerts/rules');if(r.ok)this.rules=await r.json()}catch(e){}},async createRule(){const d=document.querySelector('[x-data*="name"]')._x_dataStack[0];try{const r=await this.apiCall('/api/alerts/rules',{method:'POST',body:JSON.stringify({name:d.name,description:d.description,min_severity:d.minSeverity,channel_email:d.channelEmail,channel_slack:d.channelSlack,email_recipients:d.emailRecipients.split(',').map(s=>s.trim()).filter(Boolean),slack_webhook_url:d.slackWebhook})});if(r.ok){window.dispatchEvent(new CustomEvent('toast',{detail:{id:Date.now(),type:'success',message:'Rule created!'}}));this.loadRules()}}catch(e){}},async testRule(id){try{const r=await this.apiCall(`/api/alerts/rules/${id}/test`,{method:'POST'});const data=await r.json();window.dispatchEvent(new CustomEvent('toast',{detail:{id:Date.now(),type:'success',message:'Test sent! Check your channels.'}}))}catch(e){}},async deleteRule(id){if(!confirm('Delete this rule?'))return;try{await this.apiCall(`/api/alerts/rules/${id}`,{method:'DELETE'});this.loadRules()}catch(e){}}}}</script>{% endblock %}

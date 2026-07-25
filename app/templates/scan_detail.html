@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Scan Details - QuadSeer{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="scanDetail()" x-init="loadScan()">
+    <div x-show="scan" class="space-y-6">
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="px-3 py-1 rounded-lg text-xs font-bold uppercase"
+                        :class="scan.status === 'completed' ? 'bg-green-500/10 text-green-400' : scan.status === 'running' ? 'bg-primary-500/10 text-primary-400' : 'bg-red-500/10 text-red-400'"
+                        x-text="scan.status"></span>
+                    <span class="text-slate-500 text-sm" x-text="formatDate(scan.created_at)"></span>
+                </div>
+                <h1 class="text-3xl font-bold" x-text="scan.target"></h1>
+                <p class="text-slate-400 capitalize" x-text="scan.scan_type.replace('_', ' ')"></p>
+            </div>
+            <div class="flex gap-3">
+                <button @click="generateReport()" class="px-4 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 transition text-sm">
+                    <i class="fas fa-file-pdf mr-2"></i>Export Report
+                </button>
+                <a href="/scans" class="px-4 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 transition text-sm">
+                    <i class="fas fa-arrow-left mr-2"></i>Back
+                </a>
+            </div>
+        </div>
+
+        <!-- Risk Gauge -->
+        <div class="grid lg:grid-cols-3 gap-6">
+            <div class="glass rounded-2xl p-6 text-center">
+                <h3 class="text-sm font-medium text-slate-400 mb-4">Risk Score</h3>
+                <div class="relative w-40 h-40 mx-auto">
+                    <svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="#1e293b" stroke-width="8"/>
+                        <circle cx="50" cy="50" r="45" fill="none" :stroke="riskColor" stroke-width="8"
+                            stroke-dasharray="283" :stroke-dashoffset="283 - (283 * scan.risk_score / 100)"
+                            stroke-linecap="round" class="transition-all duration-1000"/>
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-3xl font-bold" x-text="scan.risk_score.toFixed(0)"></span>
+                    </div>
+                </div>
+                <p class="text-sm mt-2" :class="riskColorText" x-text="riskLabel"></p>
+            </div>
+
+            <div class="lg:col-span-2 glass rounded-2xl p-6">
+                <h3 class="text-sm font-medium text-slate-400 mb-4">Severity Breakdown</h3>
+                <div class="grid grid-cols-5 gap-4">
+                    <div class="text-center p-4 rounded-xl bg-red-500/5 border border-red-500/10">
+                        <div class="text-2xl font-bold text-red-400" x-text="scan.critical_count"></div>
+                        <div class="text-xs text-slate-500 mt-1">Critical</div>
+                    </div>
+                    <div class="text-center p-4 rounded-xl bg-orange-500/5 border border-orange-500/10">
+                        <div class="text-2xl font-bold text-orange-400" x-text="scan.high_count"></div>
+                        <div class="text-xs text-slate-500 mt-1">High</div>
+                    </div>
+                    <div class="text-center p-4 rounded-xl bg-yellow-500/5 border border-yellow-500/10">
+                        <div class="text-2xl font-bold text-yellow-400" x-text="scan.medium_count"></div>
+                        <div class="text-xs text-slate-500 mt-1">Medium</div>
+                    </div>
+                    <div class="text-center p-4 rounded-xl bg-green-500/5 border border-green-500/10">
+                        <div class="text-2xl font-bold text-green-400" x-text="scan.low_count"></div>
+                        <div class="text-xs text-slate-500 mt-1">Low</div>
+                    </div>
+                    <div class="text-center p-4 rounded-xl bg-blue-500/5 border border-blue-500/10">
+                        <div class="text-2xl font-bold text-blue-400" x-text="scan.info_count"></div>
+                        <div class="text-xs text-slate-500 mt-1">Info</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MITRE Badges -->
+        <div x-show="scan.mitre_tactics?.length" class="glass rounded-2xl p-6">
+            <h3 class="text-sm font-medium text-slate-400 mb-4">MITRE ATT&CK</h3>
+            <div class="flex flex-wrap gap-2">
+                <template x-for="tactic in scan.mitre_tactics" :key="tactic">
+                    <span class="px-3 py-1.5 rounded-lg bg-primary-500/10 border border-primary-500/20 text-primary-400 text-sm font-medium">
+                        <i class="fas fa-crosshairs mr-1"></i><span x-text="tactic"></span>
+                    </span>
+                </template>
+            </div>
+        </div>
+
+        <!-- Findings -->
+        <div class="glass rounded-2xl p-6">
+            <h3 class="text-lg font-semibold mb-4">Findings (<span x-text="scan.findings?.length || 0"></span>)</h3>
+            <div class="space-y-3">
+                <template x-for="finding in scan.findings" :key="finding.id">
+                    <div class="p-4 rounded-xl border" :class="severityBg(finding.severity)">
+                        <div class="flex items-start justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="px-2 py-0.5 rounded text-xs font-bold uppercase" x-text="finding.severity"></span>
+                                <h4 class="font-semibold" x-text="finding.title"></h4>
+                            </div>
+                            <span x-show="finding.cve_id" class="px-2 py-0.5 rounded bg-slate-800 text-xs font-mono text-slate-400" x-text="finding.cve_id"></span>
+                        </div>
+                        <p class="text-sm text-slate-400 mb-2" x-text="finding.description"></p>
+                        <div class="flex flex-wrap gap-2 text-xs">
+                            <span x-show="finding.category" class="px-2 py-1 rounded bg-slate-800 text-slate-400" x-text="finding.category"></span>
+                            <span x-show="finding.port" class="px-2 py-1 rounded bg-slate-800 text-slate-400">Port: <span x-text="finding.port"></span></span>
+                            <span x-show="finding.service" class="px-2 py-1 rounded bg-slate-800 text-slate-400" x-text="finding.service"></span>
+                            <span x-show="finding.country" class="px-2 py-1 rounded bg-slate-800 text-slate-400"><i class="fas fa-map-marker-alt mr-1"></i><span x-text="finding.country"></span></span>
+                        </div>
+                        <div x-show="finding.remediation" class="mt-3 p-3 rounded-lg bg-slate-900/50 text-sm">
+                            <i class="fas fa-wrench text-primary-400 mr-2"></i><span x-text="finding.remediation"></span>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="!scan.findings?.length" class="text-center text-slate-500 py-12">No findings recorded</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function scanDetail() {
+    return {
+        scan: null,
+        scanId: '{{ scan_id }}',
+
+        get riskColor() {
+            if (!this.scan) return '#334155';
+            return this.scan.risk_score > 60 ? '#ef4444' : this.scan.risk_score > 30 ? '#f97316' : '#22c55e';
+        },
+        get riskColorText() {
+            if (!this.scan) return 'text-slate-400';
+            return this.scan.risk_score > 60 ? 'text-red-400' : this.scan.risk_score > 30 ? 'text-orange-400' : 'text-green-400';
+        },
+        get riskLabel() {
+            if (!this.scan) return 'Unknown';
+            return this.scan.risk_score > 60 ? 'Critical Risk' : this.scan.risk_score > 30 ? 'Elevated Risk' : 'Low Risk';
+        },
+
+        async loadScan() {
+            try {
+                const res = await this.apiCall(`/api/scans/${this.scanId}`);
+                if (res.ok) this.scan = await res.json();
+            } catch (e) { console.error(e); }
+        },
+
+        async generateReport() {
+            try {
+                const res = await this.apiCall('/api/reports/generate', {
+                    method: 'POST',
+                    body: JSON.stringify({ name: `Scan Report - ${this.scan.target}`, scan_id: this.scanId, report_format: 'pdf' })
+                });
+                if (res.ok) {
+                    window.dispatchEvent(new CustomEvent('toast', { detail: { id: Date.now(), type: 'success', message: 'Report generation started!' } }));
+                }
+            } catch (e) { console.error(e); }
+        }
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Dark Web Monitor - QuadSeer{% endblock %}
+{% block content %}
+<div x-data="darkwebData()" x-init="loadData()">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h1>🌐 Dark Web Monitoring</h1>
+        <span class="badge badge-info">Phase 2</span>
+    </div>
+
+    <div class="grid" style="margin-bottom: 2rem;">
+        <div class="card">
+            <div style="font-size: 2rem; font-weight: 700; color: var(--highlight);" x-text="stats.paste_sites">0</div>
+            <div style="color: #8899aa; font-size: 0.9rem;">Paste Sites Monitored</div>
+        </div>
+        <div class="card">
+            <div style="font-size: 2rem; font-weight: 700; color: #ff4444;" x-text="stats.breaches">0</div>
+            <div style="color: #8899aa; font-size: 0.9rem;">Breach Findings</div>
+        </div>
+        <div class="card">
+            <div style="font-size: 2rem; font-weight: 700; color: #ff8800;" x-text="stats.ransomware">0</div>
+            <div style="color: #8899aa; font-size: 0.9rem;">Ransomware Alerts</div>
+        </div>
+        <div class="card">
+            <div style="font-size: 2rem; font-weight: 700; color: #66ccff;" x-text="stats.darkweb">0</div>
+            <div style="color: #8899aa; font-size: 0.9rem;">Dark Web Mentions</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-bottom: 1rem;">Monitoring Sources</h3>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            <div class="badge badge-info">Pastebin</div>
+            <div class="badge badge-info">Ghostbin</div>
+            <div class="badge badge-info">ZeroBin</div>
+            <div class="badge badge-info">Have I Been Pwned</div>
+            <div class="badge badge-info">DeHashed</div>
+            <div class="badge badge-info">Ransomware.live</div>
+            <div class="badge badge-info">TOR Hidden Services</div>
+        </div>
+        <p style="color: #8899aa; margin-top: 1rem; font-size: 0.85rem;">
+            Configure API keys in environment variables to enable HIBP and DeHashed integration.
+        </p>
+    </div>
+
+    <div class="card" style="margin-top: 1.5rem;">
+        <h3 style="margin-bottom: 1rem;">Recent Dark Web Findings</h3>
+        <table>
+            <thead>
+                <tr><th>Type</th><th>Severity</th><th>Asset</th><th>Source</th><th>Discovered</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="5" style="text-align: center; color: #8899aa;">
+                        Run a scan with "Dark Web", "Breach", or "Ransomware" scan types to populate findings.
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function darkwebData() {
+    return {
+        stats: { paste_sites: 3, breaches: 0, ransomware: 0, darkweb: 0 },
+        loadData() {
+            const token = localStorage.getItem('token');
+            if (!token) { window.location.href = '/login'; }
+        }
+    }
+}
+</script>
+{% endblock %}

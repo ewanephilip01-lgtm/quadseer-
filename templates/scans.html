@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}Scans — QuadSeer{% endblock %}
+{% block content %}
+<div x-data="scansApp()" x-init="initScans()">
+    <header class="page-header">
+        <h1>Scans</h1>
+        <button class="btn btn-primary" @click="showNewScan = true">+ New Scan</button>
+    </header>
+
+    <div x-show="showNewScan" class="modal" x-transition.opacity>
+        <div class="modal-content">
+            <header>
+                <h3>New Scan</h3>
+                <button class="close" @click="showNewScan = false">×</button>
+            </header>
+            <form @submit.prevent="createScan()">
+                <label>
+                    Scan Name
+                    <input type="text" x-model="newScan.name" required placeholder="e.g., Production Recon">
+                </label>
+                <label>
+                    Target
+                    <select x-model="newScan.target_id" required>
+                        <option value="">Select a target...</option>
+                        <template x-for="target in targets" :key="target.id">
+                            <option :value="target.id" x-text="target.name + ' (' + target.value + ')'"></option>
+                        </template>
+                    </select>
+                </label>
+                <label>
+                    Scan Type
+                    <select x-model="newScan.scan_type">
+                        <option value="surface">Surface</option>
+                        <option value="deep">Deep</option>
+                        <option value="stealth">Stealth</option>
+                        <option value="compliance">Compliance</option>
+                        <option value="recon">Recon</option>
+                    </select>
+                </label>
+                <footer>
+                    <button type="button" class="btn btn-secondary" @click="showNewScan = false">Cancel</button>
+                    <button type="submit" class="btn btn-primary" :disabled="creating">
+                        <span x-show="!creating">Start Scan</span>
+                        <span x-show="creating">Starting...</span>
+                    </button>
+                </footer>
+            </form>
+        </div>
+    </div>
+
+    <div class="panel">
+        <table>
+            <thead>
+                <tr><th>Name</th><th>Type</th><th>Status</th><th>Progress</th><th>Findings</th><th>Created</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+                <template x-if="scans.length === 0">
+                    <tr><td colspan="7" class="empty-cell">No scans yet. Create your first scan above.</td></tr>
+                </template>
+                <template x-for="scan in scans" :key="scan.id">
+                    <tr>
+                        <td x-text="scan.name"></td>
+                        <td><span class="tag" x-text="scan.scan_type"></span></td>
+                        <td><span class="badge" :class="'badge-' + scan.status" x-text="scan.status"></span></td>
+                        <td>
+                            <div class="progress-bar">
+                                <div class="progress-fill" :style="'width:' + scan.progress + '%'"></div>
+                                <span class="progress-text" x-text="Math.round(scan.progress) + '%'"></span>
+                            </div>
+                        </td>
+                        <td>
+                            <span x-show="scan.critical_count > 0" class="severity-dot critical" x-text="scan.critical_count"></span>
+                            <span x-show="scan.high_count > 0" class="severity-dot high" x-text="scan.high_count"></span>
+                            <span x-show="scan.medium_count > 0" class="severity-dot medium" x-text="scan.medium_count"></span>
+                            <span x-show="scan.findings_count === 0" class="text-muted">—</span>
+                        </td>
+                        <td x-text="new Date(scan.created_at).toLocaleDateString()"></td>
+                        <td>
+                            <button class="btn btn-sm" @click="viewScan(scan.id)">View</button>
+                            <button class="btn btn-sm btn-danger" x-show="['pending','queued','running'].includes(scan.status)" @click="cancelScan(scan.id)">Cancel</button>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+
+    <div x-show="wsConnected" class="ws-status connected">
+        <span class="pulse"></span> Live updates active
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function scansApp() {
+    return {
+        scans: [],
+        targets: [],
+        showNewScan: false,
+        creating: false,
+        wsConnected: false,
+        ws: null,
+        newScan: { name: '', target_id: '', scan_type: 'surface' },
+
+        async initScans() {
+            await this.loadTargets();
+            await this.loadScans();
+            this.connectWebSocket();
+        },
+
+        async loadScans() {
+            try {
+                const res = await fetch('/api/v1/scans');
+                this.scans = await res.json();
+            } catch (e) {
+                $store.toasts.add('Failed to load scans', 'error');
+            }
+        },
+
+        async loadTargets() {
+            try {
+                const res = await fetch('/api/v1/targets');
+                this.targets = await res.json();
+            } catch (e) {
+                console.error('Failed to load targets:', e);
+            }
+        },
+
+        async createScan() {
+            this.creating = true;
+            try {
+                const res = await fetch('/api/v1/scans', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.newScan)
+                });
+                if (res.ok) {
+                    $store.toasts.add('Scan started successfully', 'success');
+                    this.showNewScan = false;
+                    this.newScan = { name: '', target_id: '', scan_type: 'surface' };
+                    await this.loadScans();
+                } else {
+                    const err = await res.json();
+                    $store.toasts.add(err.detail || 'Failed to start scan', 'error');
+                }
+            } catch (e) {
+                $store.toasts.add('Network error', 'error');
+            } finally {
+                this.creating = false;
+            }
+        },
+
+        connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            this.ws = new WebSocket(`${protocol}//${window.location.host}/ws/scan/0`);
+            this.ws.onopen = () => { this.wsConnected = true; };
+            this.ws.onclose = () => { 
+                this.wsConnected = false;
+                setTimeout(() => this.connectWebSocket(), 3000);
+            };
+            this.ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                const idx = this.scans.findIndex(s => s.id === data.scan_id);
+                if (idx !== -1) {
+                    this.scans[idx].progress = data.progress;
+                    this.scans[idx].status = data.status;
+                    if (data.status === 'completed') {
+                        $store.toasts.add(`Scan "${this.scans[idx].name}" completed`, 'success');
+                        this.loadScans();
+                    }
+                }
+            };
+        },
+
+        async cancelScan(id) {
+            try {
+                const res = await fetch(`/api/v1/scans/${id}/cancel`, { method: 'POST' });
+                if (res.ok) {
+                    $store.toasts.add('Scan cancelled', 'info');
+                    await this.loadScans();
+                }
+            } catch (e) {
+                $store.toasts.add('Failed to cancel scan', 'error');
+            }
+        },
+
+        viewScan(id) {
+            window.location.href = `/scans/${id}`;
+        }
+    }
+}
+</script>
+{% endblock %}
