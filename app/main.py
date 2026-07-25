@@ -5,7 +5,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import get_settings
-from app.core.database import engine, Base, create_tables
+from app.core.database import create_tables
 from app.routes import auth, scans, admin, alerts, billing, dashboard, monitoring, organizations, reports, threat_intel
 
 settings = get_settings()
@@ -19,18 +19,11 @@ app = FastAPI(
 # Session middleware
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 
-# Static files — try root first, fallback to app/static
-import os
-if os.path.exists("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-elif os.path.exists("app/static"):
-    app.mount("/static", StaticFiles(directory="app/static"), name="static")
+# Static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Templates — try root first, fallback to app/templates
-if os.path.exists("templates"):
-    templates = Jinja2Templates(directory="templates")
-elif os.path.exists("app/templates"):
-    templates = Jinja2Templates(directory="app/templates")
+# Templates
+templates = Jinja2Templates(directory="templates")
 
 # API Routes
 app.include_router(auth.router)
@@ -44,12 +37,10 @@ app.include_router(organizations.router)
 app.include_router(reports.router)
 app.include_router(threat_intel.router)
 
-# Health check
 @app.get("/")
 async def root():
     return {"message": "QUADSEER v3.1 — Cyber Threat Intelligence Platform"}
 
-# Create tables on startup (async)
 @app.on_event("startup")
 async def startup():
     await create_tables()

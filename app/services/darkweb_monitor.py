@@ -1,28 +1,34 @@
+"""
+Dark Web Monitor Service — FIXED for QUADSEER v3.1
+"""
 import httpx
-from sqlalchemy.orm import Session
-from app.models import Scan, Finding
-from app.core.config import get_settings
+import logging
+from sqlalchemy.ext.asyncio import AsyncSession
 
-settings = get_settings()
+from app.models.scan import Scan, ScanStatus
+from app.models.finding import Finding, FindingSeverity, FindingType
+from app.core.config import ConfigManager
+
+logger = logging.getLogger(__name__)
 
 
-async def darkweb_scan_target(scan: Scan, db: Session):
+async def darkweb_scan_target(scan: Scan, db: AsyncSession):
     """
     Dark web monitoring scan for a target domain.
     Searches DeHashed for leaked credentials associated with the domain.
-    FIXED: Removed circular import from breach_checker.py
     """
-    target = scan.target.target
+    target = scan.target.target if hasattr(scan, "target") else "unknown"
     findings = []
 
-    # ── DeHashed Search (inlined, no cross-module import) ──
-    if settings.dehashed_username and settings.dehashed_api_key:
+    # Load credentials from DB config (async)
+    dehashed_email = await ConfigManager.get("dehashed_email", "")
+    dehashed_key = await ConfigManager.get("dehashed_api_key", "")
+
+    # ── DeHashed Search ──
+    if dehashed_email and dehashed_key:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                auth = httpx.BasicAuth(
-                    settings.dehashed_username,
-                    settings.dehashed_api_key
-                )
+                auth = httpx.BasicAuth(dehashed_email, dehashed_key)
                 query = f"email:@{target}"
                 response = await client.get(
                     "https://api.dehashed.com/search",
@@ -38,92 +44,110 @@ async def darkweb_scan_target(scan: Scan, db: Session):
                         email = entry.get("email", "unknown")
                         username = entry.get("username", "N/A")
                         password = entry.get("password", "")
-                        severity = "critical" if password else "high"
+                        severity = FindingSeverity.CRITICAL if password else FindingSeverity.HIGH
 
                         finding = Finding(
                             scan_id=scan.id,
+                            target_id=scan.target_id,
+                            finding_type=FindingType.DARKWEB_MENTION,
+                            severity=severity,
                             title=f"Dark Web Credential Leak: {email}",
                             description=(
                                 f"Credential found on dark web sources. "
                                 f"Username: {username}, "
                                 f"Password: {password[:3]}***" if password else "Password: N/A"
                             ),
-                            severity=severity,
                             source="dehashed",
                             raw_data=entry,
-                            confidence="high"
+                            risk_score=9.0 if password else 7.0,
+                            confidence=1.0,
                         )
                         findings.append(finding)
 
                     if not entries:
                         findings.append(Finding(
                             scan_id=scan.id,
+                            target_id=scan.target_id,
+                            finding_type=FindingType.DARKWEB_MENTION,
+                            severity=FindingSeverity.INFO,
                             title="No Dark Web Leaks Found",
                             description=f"DeHashed returned 0 leaked credentials for @{target}.",
-                            severity="info",
                             source="dehashed",
-                            confidence="high"
+                            confidence=1.0,
                         ))
 
                 elif response.status_code == 401:
                     findings.append(Finding(
                         scan_id=scan.id,
+                        target_id=scan.target_id,
+                        finding_type=FindingType.DARKWEB_MENTION,
+                        severity=FindingSeverity.WARNING,
                         title="DeHashed API Authentication Failed",
                         description="Invalid DeHashed credentials. Check admin settings.",
-                        severity="warning",
                         source="dehashed",
-                        confidence="high"
+                        confidence=1.0,
                     ))
                 else:
                     findings.append(Finding(
                         scan_id=scan.id,
+                        target_id=scan.target_id,
+                        finding_type=FindingType.DARKWEB_MENTION,
+                        severity=FindingSeverity.WARNING,
                         title="DeHashed API Error",
                         description=f"HTTP {response.status_code}: {response.text[:200]}",
-                        severity="warning",
                         source="dehashed",
-                        confidence="high"
+                        confidence=1.0,
                     ))
 
         except httpx.TimeoutException:
             findings.append(Finding(
                 scan_id=scan.id,
+                target_id=scan.target_id,
+                finding_type=FindingType.DARKWEB_MENTION,
+                severity=FindingSeverity.WARNING,
                 title="DeHashed Timeout",
                 description="Request to DeHashed API timed out after 30s.",
-                severity="warning",
                 source="dehashed",
-                confidence="high"
+                confidence=1.0,
             ))
         except Exception as e:
+            logger.error(f"DeHashed search error: {e}")
             findings.append(Finding(
                 scan_id=scan.id,
+                target_id=scan.target_id,
+                finding_type=FindingType.DARKWEB_MENTION,
+                severity=FindingSeverity.WARNING,
                 title="DeHashed Search Error",
                 description=str(e),
-                severity="warning",
                 source="dehashed",
-                confidence="high"
+                confidence=1.0,
             ))
     else:
         findings.append(Finding(
             scan_id=scan.id,
+            target_id=scan.target_id,
+            finding_type=FindingType.DARKWEB_MENTION,
+            severity=FindingSeverity.INFO,
             title="DeHashed Not Configured",
             description="Add DeHashed credentials in admin settings for dark web monitoring.",
-            severity="info",
             source="dehashed",
-            confidence="high"
+            confidence=1.0,
         ))
 
     # ── Tor / Onion Mention Monitoring (placeholder) ──
-    # Real onion scraping requires Tor proxy infrastructure
     findings.append(Finding(
         scan_id=scan.id,
+        target_id=scan.target_id,
+        finding_type=FindingType.DARKWEB_MENTION,
+        severity=FindingSeverity.INFO,
         title="Onion Site Monitoring",
         description="Onion site monitoring requires Tor proxy configuration. Add TOR_PROXY_URL to environment.",
-        severity="info",
         source="tor_monitor",
-        confidence="medium"
+        confidence=0.5,
     ))
 
-    db.add_all(findings)
-    db.commit()
+    for f in findings:
+        db.add(f)
+    await db.commit()
 
     return findings

@@ -1,5 +1,4 @@
 """Subdomain enumeration API routes."""
-from typing import List
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession

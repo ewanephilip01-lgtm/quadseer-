@@ -1,20 +1,22 @@
 """
-Subdomain Enumeration Service for QUADSEER v3.0
-Sources: crt.sh (free, no API key), DNS brute force, and CNAME chaining.
+Subdomain Enumeration Service for QUADSEER v3.1
+Sources: crt.sh (free, no API key), DNS brute force.
 """
 
 import asyncio
 import httpx
 import dns.resolver
 import dns.exception
+import logging
 from typing import List, Set, Dict, Any
-from sqlalchemy.orm import Session
-from app.models import Scan, Finding
-from app.core.config import get_settings
+from sqlalchemy.ext.asyncio import AsyncSession
 
-settings = get_settings()
+from app.models.scan import Scan
+from app.models.finding import Finding, FindingSeverity, FindingType
+from app.core.config import ConfigManager
 
-# Common subdomains for brute force
+logger = logging.getLogger(__name__)
+
 COMMON_SUBDOMAINS = [
     "www", "mail", "ftp", "localhost", "webmail", "smtp", "pop", "ns1", "ns2",
     "ns3", "ns4", "imap", "test", "vpn", "api", "dev", "staging", "demo",
@@ -82,22 +84,21 @@ async def fetch_crtsh(domain: str) -> Set[str]:
                 data = response.json()
                 for entry in data:
                     name = entry.get("name_value", "").strip().lower()
-                    # crt.sh returns wildcards like *.example.com
                     if name.startswith("*."):
                         name = name[2:]
                     if name and name.endswith(f".{domain}") and name != domain:
                         subdomains.add(name)
             else:
-                print(f"crt.sh returned HTTP {response.status_code}")
+                logger.warning(f"crt.sh returned HTTP {response.status_code}")
     except httpx.TimeoutException:
-        print("crt.sh query timed out")
+        logger.warning("crt.sh query timed out")
     except Exception as e:
-        print(f"crt.sh error: {e}")
+        logger.error(f"crt.sh error: {e}")
     return subdomains
 
 
 async def dns_resolve(subdomain: str) -> Dict[str, Any]:
-    """Resolve a subdomain via DNS. Returns record info or None."""
+    """Resolve a subdomain via DNS."""
     result = {"subdomain": subdomain, "records": {}, "resolvable": False}
     resolver = dns.resolver.Resolver()
     resolver.timeout = 3
@@ -114,7 +115,6 @@ async def dns_resolve(subdomain: str) -> Dict[str, Any]:
             continue
         except Exception:
             continue
-
     return result
 
 
@@ -134,16 +134,15 @@ async def brute_force_subdomains(domain: str, max_concurrent: int = 50) -> List[
     for r in resolved:
         if isinstance(r, dict) and r.get("resolvable"):
             results.append(r)
-
     return results
 
 
-async def subdomain_scan_target(scan: Scan, db: Session):
+async def subdomain_scan_target(scan: Scan, db: AsyncSession):
     """
     Subdomain enumeration scan.
     Combines crt.sh CT logs + DNS brute force.
     """
-    target = scan.target.target
+    target = scan.target.target if hasattr(scan, "target") else "unknown"
     findings = []
     all_subdomains: Set[str] = set()
 
@@ -154,12 +153,15 @@ async def subdomain_scan_target(scan: Scan, db: Session):
     ct_count = len(ct_subs)
     findings.append(Finding(
         scan_id=scan.id,
+        target_id=scan.target_id,
+        finding_type=FindingType.SUBDOMAIN,
+        severity=FindingSeverity.INFO if ct_count > 0 else FindingSeverity.LOW,
         title=f"Certificate Transparency: {ct_count} subdomains found",
         description=f"crt.sh returned {ct_count} unique subdomains for {target} from SSL/TLS certificate logs.",
-        severity="info" if ct_count > 0 else "low",
         source="crt.sh",
         raw_data={"subdomains": sorted(ct_subs), "count": ct_count},
-        confidence="high"
+        risk_score=0.0,
+        confidence=1.0,
     ))
 
     # ── Phase 2: DNS Brute Force ──
@@ -170,34 +172,42 @@ async def subdomain_scan_target(scan: Scan, db: Session):
     brute_count = len(brute_results)
     findings.append(Finding(
         scan_id=scan.id,
+        target_id=scan.target_id,
+        finding_type=FindingType.SUBDOMAIN,
+        severity=FindingSeverity.INFO if brute_count > 0 else FindingSeverity.LOW,
         title=f"DNS Brute Force: {brute_count} subdomains resolved",
         description=f"Resolved {brute_count} subdomains from {len(COMMON_SUBDOMAINS)} common names tested.",
-        severity="info" if brute_count > 0 else "low",
         source="dns_bruteforce",
         raw_data={"resolved": brute_results, "count": brute_count},
-        confidence="high"
+        risk_score=0.0,
+        confidence=1.0,
     ))
 
-    # ── Phase 3: Per-subdomain detail findings ──
+    # ── Phase 3: New subdomains from brute force only ──
     new_discovered = brute_subs - ct_subs
     if new_discovered:
         findings.append(Finding(
             scan_id=scan.id,
+            target_id=scan.target_id,
+            finding_type=FindingType.SUBDOMAIN,
+            severity=FindingSeverity.MEDIUM,
             title=f"{len(new_discovered)} subdomains only in DNS brute force",
-            description=f"Subdomains found via brute force but NOT in certificate transparency: {', '.join(sorted(new_discovered)[:10])}{'...' if len(new_discovered) > 10 else ''}",
-            severity="medium",
+            description=f"Subdomains found via brute force but NOT in certificate transparency.",
             source="dns_bruteforce",
             raw_data={"new_subdomains": sorted(new_discovered)},
-            confidence="high"
+            risk_score=3.0,
+            confidence=1.0,
         ))
 
     # ── Phase 4: Aggregate summary ──
     total = len(all_subdomains)
     findings.append(Finding(
         scan_id=scan.id,
+        target_id=scan.target_id,
+        finding_type=FindingType.SUBDOMAIN,
+        severity=FindingSeverity.HIGH if total > 20 else FindingSeverity.MEDIUM if total > 5 else FindingSeverity.LOW,
         title=f"Total Subdomains Discovered: {total}",
         description=f"Combined CT logs + DNS brute force found {total} unique subdomains for {target}.",
-        severity="high" if total > 20 else "medium" if total > 5 else "low",
         source="subdomain_enum",
         raw_data={
             "total": total,
@@ -205,23 +215,28 @@ async def subdomain_scan_target(scan: Scan, db: Session):
             "from_brute": brute_count,
             "all_subdomains": sorted(all_subdomains)
         },
-        confidence="high"
+        risk_score=5.0 if total > 20 else 3.0 if total > 5 else 1.0,
+        confidence=1.0,
     ))
 
-    # Mark wildcard detection
+    # Wildcard detection
     wildcard_test = f"this-should-not-exist-{hash(target) % 10000:04d}.{target}"
     wildcard_result = await dns_resolve(wildcard_test)
     if wildcard_result["resolvable"]:
         findings.append(Finding(
             scan_id=scan.id,
+            target_id=scan.target_id,
+            finding_type=FindingType.SUBDOMAIN,
+            severity=FindingSeverity.INFO,
             title="Wildcard DNS Detected",
             description=f"{target} appears to have a wildcard DNS record. Brute force results may include false positives.",
-            severity="info",
             source="dns_bruteforce",
-            confidence="high"
+            risk_score=0.0,
+            confidence=1.0,
         ))
 
-    db.add_all(findings)
-    db.commit()
+    for f in findings:
+        db.add(f)
+    await db.commit()
 
     return findings

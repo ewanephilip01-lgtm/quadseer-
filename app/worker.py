@@ -11,7 +11,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
 
 from app.config import get_settings
-from app.models.scan import Scan, ScanFinding, ScanStatus
+from app.models.scan import Scan, ScanStatus
+from app.models.finding import Finding, FindingSeverity, FindingType
 from app.models.monitor import Monitor, MonitorRun
 from app.models.alert import AlertRule, AlertLog
 from app.models.report import Report, ReportStatus
@@ -51,7 +52,6 @@ celery_app.conf.update(
 engine = create_async_engine(settings.DATABASE_URL, echo=False)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-
 def get_event_loop():
     """Get or create event loop for async operations in Celery."""
     try:
@@ -61,13 +61,11 @@ def get_event_loop():
         asyncio.set_event_loop(loop)
         return loop
 
-
 @celery_app.task(bind=True, max_retries=3)
 def run_scan_task(self, scan_id: str):
     """Execute a scan with real nmap/OSINT and notify on completion."""
     loop = get_event_loop()
     return loop.run_until_complete(_run_scan_async(scan_id))
-
 
 async def _run_scan_async(scan_id: str):
     """Async scan execution."""
@@ -79,63 +77,59 @@ async def _run_scan_async(scan_id: str):
 
         scan.status = ScanStatus.RUNNING
         scan.started_at = datetime.utcnow()
-        scan.progress = 10
         await db.commit()
 
         try:
-            if scan.scan_type == "attack_surface":
+            # Route to appropriate scanner based on scan_type
+            if scan.scan_type.value == "attack_surface":
                 results = await scanner_service.run_attack_surface_scan(scan.target)
-            elif scan.scan_type == "brand_protection":
+            elif scan.scan_type.value == "brand_protection":
                 results = await scanner_service.run_brand_protection_scan(scan.target)
-            elif scan.scan_type == "credential_leak":
+            elif scan.scan_type.value == "credential_leak":
                 results = await scanner_service.run_credential_leak_scan(scan.target)
-            elif scan.scan_type == "dark_web":
+            elif scan.scan_type.value == "dark_web":
                 results = await scanner_service.run_dark_web_scan(scan.target)
+            elif scan.scan_type.value == "breach":
+                from app.services.breach_checker import breach_service
+                results = await breach_service.scan_target(scan, db)
+            elif scan.scan_type.value == "ransomware":
+                from app.services.ransomware_tracker import ransomware_service
+                results = await ransomware_service.scan_target(scan, db)
+            elif scan.scan_type.value == "darkweb":
+                from app.services.darkweb_monitor import darkweb_scan_target
+                results = await darkweb_scan_target(scan, db)
+            elif scan.scan_type.value == "subdomain":
+                from app.services.subdomain_enum import subdomain_scan_target
+                results = await subdomain_scan_target(scan, db)
             else:
-                results = {"findings": [], "risk_score": 0, "mitre_tactics": [], "mitre_techniques": [], "geo_locations": []}
-
-            scan.progress = 80
-            await db.commit()
+                results = {"findings": [], "risk_score": 0}
 
             severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
 
             for f_data in results.get("findings", []):
-                finding = ScanFinding(
+                # Map old ScanFinding fields to Finding model
+                severity_str = f_data.get("severity", "info")
+                try:
+                    severity = FindingSeverity(severity_str)
+                except ValueError:
+                    severity = FindingSeverity.INFO
+
+                finding = Finding(
                     scan_id=scan.id,
+                    target_id=scan.target_id,
+                    finding_type=FindingType(f_data.get("category", "dns_record")),
+                    severity=severity,
                     title=f_data["title"],
                     description=f_data.get("description"),
-                    severity=f_data.get("severity", "info"),
-                    category=f_data.get("category"),
-                    cve_id=f_data.get("cve_id"),
-                    port=f_data.get("port"),
-                    service=f_data.get("service"),
-                    banner=f_data.get("banner"),
-                    evidence=f_data.get("evidence"),
-                    remediation=f_data.get("remediation"),
-                    ip_address=f_data.get("ip_address"),
-                    country=f_data.get("country"),
-                    city=f_data.get("city"),
-                    latitude=f_data.get("latitude"),
-                    longitude=f_data.get("longitude"),
-                    mitre_tactic=f_data.get("mitre_tactic"),
-                    mitre_technique=f_data.get("mitre_technique"),
+                    source=f_data.get("source", "scanner"),
+                    raw_data=f_data,
+                    risk_score=5.0 if severity == FindingSeverity.CRITICAL else 3.0 if severity == FindingSeverity.HIGH else 1.0,
+                    confidence=0.9,
                 )
                 db.add(finding)
-                severity_counts[finding.severity] = severity_counts.get(finding.severity, 0) + 1
+                severity_counts[severity.value] = severity_counts.get(severity.value, 0) + 1
 
             scan.status = ScanStatus.COMPLETED
-            scan.progress = 100
-            scan.risk_score = results.get("risk_score", 0)
-            scan.findings_count = len(results.get("findings", []))
-            scan.critical_count = severity_counts.get("critical", 0)
-            scan.high_count = severity_counts.get("high", 0)
-            scan.medium_count = severity_counts.get("medium", 0)
-            scan.low_count = severity_counts.get("low", 0)
-            scan.info_count = severity_counts.get("info", 0)
-            scan.mitre_tactics = results.get("mitre_tactics", [])
-            scan.mitre_techniques = results.get("mitre_techniques", [])
-            scan.geo_locations = results.get("geo_locations", [])
-            scan.raw_results = results.get("raw_osint", {})
             scan.completed_at = datetime.utcnow()
 
             await db.commit()
@@ -145,17 +139,14 @@ async def _run_scan_async(scan_id: str):
 
         except Exception as e:
             scan.status = ScanStatus.FAILED
-            scan.progress = 0
             await db.commit()
             raise self.retry(exc=e, countdown=60)
-
 
 @celery_app.task
 def run_monitor_task(monitor_id: str):
     """Execute a monitor check."""
     loop = get_event_loop()
     return loop.run_until_complete(_run_monitor_async(monitor_id))
-
 
 async def _run_monitor_async(monitor_id: str):
     """Async monitor execution."""
@@ -222,13 +213,11 @@ async def _run_monitor_async(monitor_id: str):
             await db.commit()
             return {"error": str(e)}
 
-
 @celery_app.task
 def check_due_monitors():
     """Celery Beat task: Check and queue due monitors every hour."""
     loop = get_event_loop()
     return loop.run_until_complete(_check_due_monitors_async())
-
 
 async def _check_due_monitors_async():
     """Find monitors due for execution and queue them."""
@@ -250,13 +239,11 @@ async def _check_due_monitors_async():
         await db.commit()
         return {"queued": queued, "checked_at": now.isoformat()}
 
-
 @celery_app.task
 def generate_report_task(report_id: str):
     """Generate a report in background."""
     loop = get_event_loop()
     return loop.run_until_complete(_generate_report_async(report_id))
-
 
 async def _generate_report_async(report_id: str):
     """Async report generation."""
@@ -286,17 +273,16 @@ async def _generate_report_async(report_id: str):
             await db.commit()
             return {"error": str(e)}
 
-
 async def _trigger_scan_alerts(db, scan):
     """Trigger alert rules for a completed scan."""
     result = await db.execute(
-        select(AlertRule).where(AlertRule.owner_id == scan.owner_id, AlertRule.is_active == True, AlertRule.trigger_on_scan == True)
+        select(AlertRule).where(AlertRule.owner_id == scan.user_id, AlertRule.is_active == True, AlertRule.trigger_on_scan == True)
     )
     rules = result.scalars().all()
 
     severity_order = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
     scan_max_severity = max(
-        [severity_order.get(f.severity, 0) for f in scan.findings] or [0]
+        [severity_order.get(f.severity.value, 0) for f in scan.findings] or [0]
     )
 
     for rule in rules:
@@ -307,14 +293,14 @@ async def _trigger_scan_alerts(db, scan):
         if rule.scan_types and scan.scan_type not in rule.scan_types:
             continue
 
-        findings = [f for f in scan.findings if severity_order.get(f.severity, 0) >= rule_min]
+        findings = [f for f in scan.findings if severity_order.get(f.severity.value, 0) >= rule_min]
 
         if rule.channel_email and rule.email_recipients:
             await email_service.send_alert_email(
                 rule.email_recipients,
-                f"Alert: {scan.scan_type.replace('_', ' ').title()} Scan - {scan.target}",
+                f"Alert: {scan.scan_type.value.replace('_', ' ').title()} Scan - {scan.target}",
                 f"Scan completed with {len(findings)} findings matching your alert criteria.",
-                findings=[{"title": f.title, "severity": f.severity, "description": f.description} for f in findings[:10]],
+                findings=[{"title": f.title, "severity": f.severity.value, "description": f.description} for f in findings[:10]],
             )
 
             log = AlertLog(
@@ -322,7 +308,7 @@ async def _trigger_scan_alerts(db, scan):
                 channel="email",
                 status="sent",
                 recipient=", ".join(rule.email_recipients),
-                subject=f"Alert: {scan.scan_type} Scan",
+                subject=f"Alert: {scan.scan_type.value} Scan",
                 related_scan_id=scan.id,
                 sent_at=datetime.utcnow(),
             )
@@ -332,9 +318,9 @@ async def _trigger_scan_alerts(db, scan):
             await slack_service.send_alert(
                 rule.slack_webhook_url,
                 f"Scan Alert: {scan.target}",
-                f"{scan.scan_type.replace('_', ' ').title()} scan found {len(findings)} issues",
+                f"{scan.scan_type.value.replace('_', ' ').title()} scan found {len(findings)} issues",
                 severity="high" if scan_max_severity >= 3 else "medium",
-                findings=[{"title": f.title, "severity": f.severity} for f in findings[:5]],
+                findings=[{"title": f.title, "severity": f.severity.value} for f in findings[:5]],
                 scan_url=f"{settings.APP_URL}/scan/{scan.id}",
             )
 
@@ -349,4 +335,4 @@ async def _trigger_scan_alerts(db, scan):
             )
             db.add(log)
 
-    await db.commit()
+        await db.commit()
